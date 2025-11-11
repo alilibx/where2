@@ -98,4 +98,32 @@ export default defineSchema({
   })
   .index("by_user", ["userId"])
   .index("by_timestamp", ["timestamp"]),
+
+  // Conversations for chat mode
+  conversations: defineTable({
+    userId: v.string(),
+    messages: v.array(
+      v.object({
+        role: v.string(), // "user" or "assistant"
+        content: v.string(),
+        timestamp: v.number(),
+      })
+    ),
+    lastMessage: v.number(),
+    currentFilters: v.optional(
+      v.object({
+        category: v.optional(v.string()),
+        tags: v.array(v.string()),
+        priceLevel: v.optional(v.string()),
+        area: v.optional(v.string()),
+        nearMetro: v.optional(v.boolean()),
+        minRating: v.optional(v.number()),
+        cuisine: v.array(v.string()),
+        noise: v.optional(v.string()),
+        openNow: v.boolean(),
+      })
+    ),
+  })
+  .index("by_user", ["userId"])
+  .index("by_last_message", ["lastMessage"]),
 });

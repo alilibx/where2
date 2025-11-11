@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import { SearchBar } from "./components/SearchBar";
+import { AISearchBar } from "./components/AISearchBar";
+import { ChatInterface } from "./components/ChatInterface";
 import { FilterChips } from "./components/FilterChips";
 import { ResultsList } from "./components/ResultsList";
 import { PreferenceToggle } from "./components/PreferenceToggle";
+import { MessageSquare, Search as SearchIcon, Sparkles } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 
@@ -41,6 +44,8 @@ export default function Home() {
 
   const [showResults, setShowResults] = useState(false);
   const [locationPermissionAsked, setLocationPermissionAsked] = useState(false);
+  const [mode, setMode] = useState<"search" | "chat">("search"); // search or chat mode
+  const [useAI, setUseAI] = useState(true); // Toggle AI parsing in search mode
 
   const userPrefs = useQuery(api.preferences.getUserPreferences, { userId });
 
@@ -57,8 +62,24 @@ export default function Home() {
       : "skip"
   );
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
+  const handleSearch = (query: string, aiFilters?: any, intent?: string) => {
+    setSearchQuery(intent || query);
+
+    // If AI provided filters, merge them with existing filters
+    if (aiFilters) {
+      setFilters({
+        category: aiFilters.category || filters.category,
+        tags: aiFilters.tags || filters.tags,
+        priceLevel: aiFilters.priceLevel || filters.priceLevel,
+        area: aiFilters.area || filters.area,
+        nearMetro: aiFilters.nearMetro !== undefined ? aiFilters.nearMetro : filters.nearMetro,
+        minRating: aiFilters.minRating || filters.minRating,
+        cuisine: aiFilters.cuisine || filters.cuisine,
+        noise: aiFilters.noise || filters.noise,
+        openNow: aiFilters.openNow !== undefined ? aiFilters.openNow : filters.openNow,
+      });
+    }
+
     setShowResults(true);
 
     // Request location permission on first search if not asked
@@ -91,19 +112,119 @@ export default function Home() {
       {/* Header */}
       <div style={{ background: "rgba(255,255,255,0.1)", backdropFilter: "blur(10px)" }}>
         <div className="container" style={{ padding: "20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
             <h1 style={{ color: "white", fontSize: "28px", fontWeight: "700" }}>
               Where2 Dubai
             </h1>
-            <PreferenceToggle userId={userId} currentPrefs={userPrefs || undefined} />
+
+            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+              {/* Mode Toggle */}
+              <div
+                style={{
+                  display: "flex",
+                  background: "rgba(255,255,255,0.2)",
+                  borderRadius: "12px",
+                  padding: "4px",
+                }}
+              >
+                <button
+                  onClick={() => setMode("search")}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "8px",
+                    background: mode === "search" ? "white" : "transparent",
+                    color: mode === "search" ? "#667eea" : "white",
+                    fontWeight: "600",
+                    fontSize: "14px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  <SearchIcon size={16} />
+                  Search
+                </button>
+                <button
+                  onClick={() => {
+                    setMode("chat");
+                    setShowResults(false);
+                  }}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "8px",
+                    background: mode === "chat" ? "white" : "transparent",
+                    color: mode === "chat" ? "#667eea" : "white",
+                    fontWeight: "600",
+                    fontSize: "14px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  <MessageSquare size={16} />
+                  Chat
+                </button>
+              </div>
+
+              {/* AI Toggle for Search Mode */}
+              {mode === "search" && (
+                <button
+                  onClick={() => setUseAI(!useAI)}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "8px",
+                    background: useAI ? "rgba(102, 126, 234, 0.3)" : "rgba(255,255,255,0.2)",
+                    color: "white",
+                    fontWeight: "600",
+                    fontSize: "14px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    border: useAI ? "2px solid rgba(102, 126, 234, 0.5)" : "2px solid transparent",
+                    transition: "all 0.2s",
+                  }}
+                  title={useAI ? "AI parsing enabled" : "AI parsing disabled"}
+                >
+                  <Sparkles size={16} />
+                  AI {useAI ? "ON" : "OFF"}
+                </button>
+              )}
+
+              <PreferenceToggle userId={userId} currentPrefs={userPrefs || undefined} />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="container" style={{ marginTop: "40px" }}>
-        {!showResults ? (
-          // Home/Onboarding View
+        {mode === "chat" ? (
+          // Chat Mode
+          <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+            <ChatInterface userId={userId} onSearchTriggered={handleSearch} />
+
+            {/* Show results below chat if any */}
+            {showResults && results && (
+              <div style={{ marginTop: "32px" }}>
+                <h3 style={{ color: "white", fontSize: "24px", fontWeight: "600", marginBottom: "16px" }}>
+                  Results
+                </h3>
+                <FilterChips filters={filters} onFilterChange={handleFilterChange} />
+                <ResultsList
+                  results={results.places}
+                  bestMatch={results.bestMatch}
+                  totalCount={results.totalCount}
+                  userId={userId}
+                  searchQuery={searchQuery}
+                  filters={filters}
+                />
+              </div>
+            )}
+          </div>
+        ) : !showResults ? (
+          // Home/Onboarding View (Search Mode)
           <div style={{ textAlign: "center", maxWidth: "600px", margin: "0 auto" }}>
             <h2
               style={{
@@ -119,7 +240,11 @@ export default function Home() {
               Discover the perfect place in Dubai, right now.
             </p>
 
-            <SearchBar onSearch={handleSearch} />
+            {useAI ? (
+              <AISearchBar onSearch={handleSearch} useAI={true} />
+            ) : (
+              <SearchBar onSearch={handleSearch} />
+            )}
 
             {/* Quick chips */}
             <div style={{ marginTop: "32px" }}>
@@ -179,7 +304,13 @@ export default function Home() {
                 <li style={{ display: "flex", gap: "12px" }}>
                   <span style={{ fontSize: "24px" }}>🎯</span>
                   <div>
-                    <strong>Get smart matches</strong> based on your preferences
+                    <strong>AI-powered matching</strong> understands your intent
+                  </div>
+                </li>
+                <li style={{ display: "flex", gap: "12px" }}>
+                  <span style={{ fontSize: "24px" }}>💬</span>
+                  <div>
+                    <strong>Chat mode available</strong> for conversational search
                   </div>
                 </li>
                 <li style={{ display: "flex", gap: "12px" }}>
@@ -192,10 +323,14 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          // Results View
+          // Results View (Search Mode)
           <div>
             <div style={{ marginBottom: "24px" }}>
-              <SearchBar onSearch={handleSearch} initialValue={searchQuery} />
+              {useAI ? (
+                <AISearchBar onSearch={handleSearch} initialValue={searchQuery} useAI={true} />
+              ) : (
+                <SearchBar onSearch={handleSearch} initialValue={searchQuery} />
+              )}
             </div>
 
             <FilterChips filters={filters} onFilterChange={handleFilterChange} />
