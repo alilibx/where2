@@ -122,9 +122,9 @@ export const parseSearchQuery = action({
     const client = getOpenAIClient();
 
     // Build messages with context
-    const messages: any[] = [
+    const messages = [
       {
-        role: "system",
+        role: "system" as const,
         content: `You are an AI assistant helping users find venues in Dubai. Your job is to understand their natural language queries and convert them into structured search filters.
 
 Context about Dubai:
@@ -154,12 +154,16 @@ Default values:
 
     // Add conversation history if provided
     if (args.conversationHistory && args.conversationHistory.length > 0) {
-      messages.push(...args.conversationHistory);
+      const historyMessages = args.conversationHistory.map((msg) => ({
+        role: msg.role as "user" | "assistant" | "system",
+        content: msg.content,
+      }));
+      messages.push(...historyMessages);
     }
 
     // Add current query
     messages.push({
-      role: "user",
+      role: "user" as const,
       content: args.query,
     });
 
@@ -253,12 +257,12 @@ Keep it conversational.`;
         model: "openai/gpt-4o-mini", // Faster, cheaper for simple generation
         messages: [
           {
-            role: "system",
+            role: "system" as const,
             content:
               "You are a friendly, helpful AI assistant for Where2 Dubai. Be concise, warm, and actionable.",
           },
           {
-            role: "user",
+            role: "user" as const,
             content: prompt,
           },
         ],
@@ -299,7 +303,7 @@ export const chatWithAI = action({
     const client = getOpenAIClient();
 
     const systemMessage = {
-      role: "system",
+      role: "system" as const,
       content: `You are Where2, a friendly AI assistant helping users discover venues in Dubai.
 
 Your capabilities:
@@ -330,10 +334,16 @@ Guidelines:
 - Use emojis sparingly and naturally`,
     };
 
+    // Cast messages to proper OpenAI format
+    const chatMessages = args.messages.map((msg) => ({
+      role: msg.role as "user" | "assistant" | "system",
+      content: msg.content,
+    }));
+
     try {
       const completion = await client.chat.completions.create({
         model: "openai/gpt-4o-mini",
-        messages: [systemMessage, ...args.messages],
+        messages: [systemMessage, ...chatMessages],
         temperature: 0.8,
         max_tokens: 200,
       });
