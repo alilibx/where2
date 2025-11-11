@@ -99,8 +99,28 @@ export default function Home() {
     }
   };
 
-  const handleFilterChange = (newFilters: typeof filters) => {
-    setFilters(newFilters);
+  const handleFilterChange = (newFilters: {
+    category?: string;
+    tags: string[];
+    priceLevel?: string;
+    area?: string;
+    nearMetro?: boolean;
+    minRating?: number;
+    cuisine: string[];
+    noise?: string;
+    openNow: boolean;
+  }) => {
+    setFilters({
+      category: newFilters.category,
+      tags: newFilters.tags,
+      priceLevel: newFilters.priceLevel,
+      area: newFilters.area,
+      nearMetro: newFilters.nearMetro,
+      minRating: newFilters.minRating,
+      cuisine: newFilters.cuisine,
+      noise: newFilters.noise,
+      openNow: newFilters.openNow,
+    });
     if (showResults) {
       // Trigger re-search with new filters
       setShowResults(true);

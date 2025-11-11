@@ -15,6 +15,8 @@ interface Place {
   reasons: string;
   area: string;
   cuisine: string[];
+  latitude: number;
+  longitude: number;
 }
 
 interface ResultsListProps {

@@ -1,22 +1,28 @@
 import { mutation } from "./_generated/server";
 
+// Clear all places from the database
+export const clearPlaces = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const places = await ctx.db.query("places").collect();
+    for (const place of places) {
+      await ctx.db.delete(place._id);
+    }
+    return { message: `Deleted ${places.length} places` };
+  },
+});
+
 // Sample Dubai venues data for MVP testing
 export const seedPlaces = mutation({
   args: {},
   handler: async (ctx) => {
-    // Check if already seeded
-    const existing = await ctx.db.query("places").first();
-    if (existing) {
-      return { message: "Database already seeded" };
-    }
-
     const places = [
       // Marina - Outdoor Cafes
       {
         name: "The Surf Cafe",
         nameAr: "مقهى ذا سيرف",
-        coverImage: "/images/surf-cafe.jpg",
-        gallery: ["/images/surf-cafe-1.jpg", "/images/surf-cafe-2.jpg"],
+        coverImage: "https://placehold.co/800x600/667eea/white?text=Surf+Cafe",
+        gallery: ["https://placehold.co/800x600/667eea/white?text=Surf+Cafe+1", "https://placehold.co/800x600/667eea/white?text=Surf+Cafe+2"],
         latitude: 25.0801,
         longitude: 55.1384,
         area: "Marina",
@@ -52,8 +58,8 @@ export const seedPlaces = mutation({
       {
         name: "Zafran Indian Bistro",
         nameAr: "زعفران مطعم هندي",
-        coverImage: "/images/zafran.jpg",
-        gallery: ["/images/zafran-1.jpg", "/images/zafran-2.jpg"],
+        coverImage: "https://placehold.co/800x600/667eea/white?text=Zafran+Bistro",
+        gallery: ["https://placehold.co/800x600/667eea/white?text=Zafran+1", "https://placehold.co/800x600/667eea/white?text=Zafran+2"],
         latitude: 25.1862,
         longitude: 55.2666,
         area: "Business Bay",
@@ -89,8 +95,8 @@ export const seedPlaces = mutation({
       {
         name: "Armani/Ristorante",
         nameAr: "أرماني ريستورانتي",
-        coverImage: "/images/armani.jpg",
-        gallery: ["/images/armani-1.jpg", "/images/armani-2.jpg"],
+        coverImage: "https://placehold.co/800x600/667eea/white?text=Armani+Ristorante",
+        gallery: ["https://placehold.co/800x600/667eea/white?text=Armani+1", "https://placehold.co/800x600/667eea/white?text=Armani+2"],
         latitude: 25.1972,
         longitude: 55.2744,
         area: "Downtown",
@@ -126,8 +132,8 @@ export const seedPlaces = mutation({
       {
         name: "The Beach House",
         nameAr: "بيت الشاطئ",
-        coverImage: "/images/beach-house.jpg",
-        gallery: ["/images/beach-house-1.jpg"],
+        coverImage: "https://placehold.co/800x600/667eea/white?text=Beach+House",
+        gallery: ["https://placehold.co/800x600/667eea/white?text=Beach+House+1"],
         latitude: 25.0782,
         longitude: 55.1322,
         area: "JBR",
@@ -162,8 +168,8 @@ export const seedPlaces = mutation({
       {
         name: "Social House",
         nameAr: "سوشال هاوس",
-        coverImage: "/images/social-house.jpg",
-        gallery: ["/images/social-house-1.jpg"],
+        coverImage: "https://placehold.co/800x600/667eea/white?text=Social+House",
+        gallery: ["https://placehold.co/800x600/667eea/white?text=Social+House+1"],
         latitude: 25.2048,
         longitude: 55.2708,
         area: "City Walk",
@@ -197,8 +203,8 @@ export const seedPlaces = mutation({
       {
         name: "Ravi Restaurant",
         nameAr: "مطعم رافي",
-        coverImage: "/images/ravi.jpg",
-        gallery: ["/images/ravi-1.jpg"],
+        coverImage: "https://placehold.co/800x600/667eea/white?text=Ravi+Restaurant",
+        gallery: ["https://placehold.co/800x600/667eea/white?text=Ravi+1"],
         latitude: 25.1124,
         longitude: 55.1975,
         area: "Al Barsha",
@@ -233,8 +239,8 @@ export const seedPlaces = mutation({
       {
         name: "Riva Beach Club",
         nameAr: "نادي ريفا الشاطئي",
-        coverImage: "/images/riva.jpg",
-        gallery: ["/images/riva-1.jpg", "/images/riva-2.jpg"],
+        coverImage: "https://placehold.co/800x600/667eea/white?text=Riva+Beach+Club",
+        gallery: ["https://placehold.co/800x600/667eea/white?text=Riva+1", "https://placehold.co/800x600/667eea/white?text=Riva+2"],
         latitude: 25.1124,
         longitude: 55.1397,
         area: "Palm Jumeirah",
@@ -268,8 +274,8 @@ export const seedPlaces = mutation({
       {
         name: "Jones the Grocer",
         nameAr: "جونز ذا جروسر",
-        coverImage: "/images/jones.jpg",
-        gallery: ["/images/jones-1.jpg"],
+        coverImage: "https://placehold.co/800x600/667eea/white?text=Jones+the+Grocer",
+        gallery: ["https://placehold.co/800x600/667eea/white?text=Jones+1"],
         latitude: 25.2138,
         longitude: 55.2811,
         area: "DIFC",
@@ -305,8 +311,8 @@ export const seedPlaces = mutation({
       {
         name: "Tom & Serg",
         nameAr: "توم آند سيرج",
-        coverImage: "/images/tom-serg.jpg",
-        gallery: ["/images/tom-serg-1.jpg"],
+        coverImage: "https://placehold.co/800x600/667eea/white?text=Tom+and+Serg",
+        gallery: ["https://placehold.co/800x600/667eea/white?text=Tom+Serg+1"],
         latitude: 25.2285,
         longitude: 55.2593,
         area: "Jumeirah",
@@ -339,8 +345,8 @@ export const seedPlaces = mutation({
       {
         name: "Al Mansour Dhow",
         nameAr: "الدو المنصور",
-        coverImage: "/images/dhow.jpg",
-        gallery: ["/images/dhow-1.jpg"],
+        coverImage: "https://placehold.co/800x600/667eea/white?text=Al+Mansour+Dhow",
+        gallery: ["https://placehold.co/800x600/667eea/white?text=Dhow+1"],
         latitude: 25.2697,
         longitude: 55.3094,
         area: "Deira",

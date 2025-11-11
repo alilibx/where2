@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, Trash2, Sparkles } from "lucide-react";
+import { Send, Loader2, Trash2, Sparkles, Mic, MicOff } from "lucide-react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
@@ -13,6 +13,8 @@ interface ChatInterfaceProps {
 export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [recognition, setRecognition] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const conversation = useQuery(api.conversations.getConversation, { userId });
@@ -22,6 +24,53 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
   const chatWithAI = useAction(api.ai.chatWithAI);
 
   const messages = conversation?.messages || [];
+
+  // Initialize Web Speech API
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition =
+        (window as any).SpeechRecognition ||
+        (window as any).webkitSpeechRecognition;
+
+      if (SpeechRecognition) {
+        const recognitionInstance = new SpeechRecognition();
+        recognitionInstance.continuous = true; // Keep listening until manually stopped
+        recognitionInstance.interimResults = true;
+        recognitionInstance.lang = "en-US";
+        recognitionInstance.maxAlternatives = 1;
+
+        recognitionInstance.onresult = (event: any) => {
+          let transcript = "";
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          setInput(transcript);
+        };
+
+        recognitionInstance.onerror = (event: any) => {
+          console.error("Speech recognition error:", event.error);
+          setIsListening(false);
+          // Show user-friendly error message
+          if (event.error === 'no-speech') {
+            console.log("No speech detected, please try again");
+          } else if (event.error === 'not-allowed') {
+            alert("Microphone access denied. Please allow microphone access in your browser settings.");
+          }
+        };
+
+        recognitionInstance.onend = () => {
+          // Only set to false if we didn't manually stop it
+          setIsListening(false);
+        };
+
+        recognitionInstance.onstart = () => {
+          console.log("Speech recognition started");
+        };
+
+        setRecognition(recognitionInstance);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -119,6 +168,32 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
   const handleClear = async () => {
     if (confirm("Clear conversation history?")) {
       await clearConversation({ userId });
+    }
+  };
+
+  const toggleVoiceInput = () => {
+    if (!recognition) {
+      alert("Voice input is not supported in your browser. Please use Chrome or Edge.");
+      return;
+    }
+
+    if (isListening) {
+      try {
+        recognition.stop();
+      } catch (error) {
+        console.error("Error stopping recognition:", error);
+      }
+      setIsListening(false);
+    } else {
+      try {
+        setInput(""); // Clear input before starting
+        recognition.start();
+        setIsListening(true);
+      } catch (error) {
+        console.error("Error starting recognition:", error);
+        setIsListening(false);
+        alert("Failed to start voice input. Please try again.");
+      }
     }
   };
 
@@ -296,20 +371,43 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask me anything about Dubai venues..."
-            disabled={isProcessing}
+            placeholder={isListening ? "Listening..." : "Ask me anything about Dubai venues..."}
+            disabled={isProcessing || isListening}
             rows={2}
             style={{
               flex: 1,
               padding: "12px",
               borderRadius: "12px",
-              border: "1px solid #e5e7eb",
+              border: `2px solid ${isListening ? "#667eea" : "#e5e7eb"}`,
               outline: "none",
               fontSize: "15px",
               resize: "none",
               fontFamily: "inherit",
+              background: isListening ? "#f0f4ff" : "white",
             }}
           />
+          <button
+            onClick={toggleVoiceInput}
+            disabled={isProcessing}
+            className="btn"
+            style={{
+              minWidth: "48px",
+              height: "48px",
+              padding: "12px",
+              background: isListening ? "#ef4444" : "#667eea",
+              color: "white",
+              borderRadius: "12px",
+              border: "none",
+              cursor: isProcessing ? "not-allowed" : "pointer",
+              opacity: isProcessing ? 0.5 : 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            title={isListening ? "Stop recording" : "Start voice input"}
+          >
+            {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+          </button>
           <button
             onClick={handleSend}
             disabled={!input.trim() || isProcessing}
@@ -332,7 +430,7 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
             textAlign: "center",
           }}
         >
-          Press Enter to send • Shift+Enter for new line
+          Press Enter to send • Shift+Enter for new line • Click mic for voice input
         </p>
       </div>
 
