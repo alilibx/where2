@@ -91,6 +91,10 @@ export const recordPlaceSelection = mutation({
       priceLevel: v.optional(v.string()),
       area: v.optional(v.string()),
       nearMetro: v.optional(v.boolean()),
+      minRating: v.optional(v.number()),
+      cuisine: v.array(v.string()),
+      noise: v.optional(v.string()),
+      openNow: v.boolean(),
     }),
   },
   handler: async (ctx, args) => {
