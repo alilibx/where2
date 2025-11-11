@@ -121,10 +121,13 @@ export const parseSearchQuery = action({
   handler: async (ctx, args) => {
     const client = getOpenAIClient();
 
-    // Build messages with context
-    const messages = [
+    // Build messages with context - explicitly type as array of chat messages
+    const messages: Array<{
+      role: "system" | "user" | "assistant";
+      content: string;
+    }> = [
       {
-        role: "system" as const,
+        role: "system",
         content: `You are an AI assistant helping users find venues in Dubai. Your job is to understand their natural language queries and convert them into structured search filters.
 
 Context about Dubai:
@@ -163,7 +166,7 @@ Default values:
 
     // Add current query
     messages.push({
-      role: "user" as const,
+      role: "user",
       content: args.query,
     });
 
