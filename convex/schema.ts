@@ -51,11 +51,21 @@ export default defineSchema({
     category: v.string(), // cafe, restaurant, etc.
     verified: v.boolean(),
     lastUpdated: v.number(), // timestamp
+
+    // Vector search (semantic search)
+    embedding: v.optional(v.array(v.float64())), // 1536 dimensions (OpenAI text-embedding-3-small)
+    embeddingModel: v.optional(v.string()), // e.g., "text-embedding-3-small"
+    lastEmbedded: v.optional(v.number()), // timestamp of last embedding generation
   })
   .index("by_area", ["area"])
   .index("by_category", ["category"])
   .index("by_rating", ["rating"])
-  .index("by_near_metro", ["nearMetro"]),
+  .index("by_near_metro", ["nearMetro"])
+  .vectorIndex("by_semantic_search", {
+    vectorField: "embedding",
+    dimensions: 1536,
+    filterFields: ["category", "priceLevel", "area", "nearMetro"],
+  }),
 
   // User preferences
   userPreferences: defineTable({

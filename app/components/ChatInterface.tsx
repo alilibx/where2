@@ -15,6 +15,7 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
   const [isProcessing, setIsProcessing] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
+  const isListeningRef = useRef(false); // Track listening state for closures
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const conversation = useQuery(api.conversations.getConversation, { userId });
@@ -49,18 +50,41 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
 
         recognitionInstance.onerror = (event: any) => {
           console.error("Speech recognition error:", event.error);
-          setIsListening(false);
-          // Show user-friendly error message
+
+          // Handle specific errors
           if (event.error === 'no-speech') {
-            console.log("No speech detected, please try again");
-          } else if (event.error === 'not-allowed') {
+            // Don't stop for no-speech in continuous mode - just log it
+            console.log("No speech detected, continuing to listen...");
+            return;
+          } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            setIsListening(false);
             alert("Microphone access denied. Please allow microphone access in your browser settings.");
+          } else if (event.error === 'aborted') {
+            // User manually stopped, don't restart
+            setIsListening(false);
+          } else {
+            // Other errors - try to continue
+            console.log("Recognition error, attempting to continue:", event.error);
           }
         };
 
         recognitionInstance.onend = () => {
-          // Only set to false if we didn't manually stop it
-          setIsListening(false);
+          // Auto-restart if user hasn't manually stopped
+          console.log("Recognition ended, checking if should restart...");
+
+          // Check ref instead of state to avoid closure issues
+          setTimeout(() => {
+            if (isListeningRef.current) {
+              try {
+                console.log("Restarting recognition...");
+                recognitionInstance.start();
+              } catch (error) {
+                console.error("Failed to restart recognition:", error);
+                setIsListening(false);
+                isListeningRef.current = false;
+              }
+            }
+          }, 100);
         };
 
         recognitionInstance.onstart = () => {
@@ -179,6 +203,7 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
 
     if (isListening) {
       try {
+        isListeningRef.current = false; // Set ref first to prevent restart
         recognition.stop();
       } catch (error) {
         console.error("Error stopping recognition:", error);
@@ -187,11 +212,13 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
     } else {
       try {
         setInput(""); // Clear input before starting
+        isListeningRef.current = true; // Set ref before starting
         recognition.start();
         setIsListening(true);
       } catch (error) {
         console.error("Error starting recognition:", error);
         setIsListening(false);
+        isListeningRef.current = false;
         alert("Failed to start voice input. Please try again.");
       }
     }

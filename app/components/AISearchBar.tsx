@@ -39,8 +39,13 @@ export function AISearchBar({
         handleSearch(transcript);
       };
 
-      recognitionRef.current.onerror = () => {
+      recognitionRef.current.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
         setIsListening(false);
+
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          alert("Microphone access denied. Please allow microphone access in your browser settings.");
+        }
       };
 
       recognitionRef.current.onend = () => {

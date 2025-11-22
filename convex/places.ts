@@ -252,6 +252,9 @@ export const getPlace = query({
   },
 });
 
+// Alias for semantic search compatibility
+export const getPlaceById = getPlace;
+
 // Add a new place (for admin/owner use)
 export const addPlace = mutation({
   args: {

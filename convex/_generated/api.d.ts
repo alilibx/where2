@@ -10,9 +10,11 @@
 
 import type * as ai from "../ai.js";
 import type * as conversations from "../conversations.js";
+import type * as embeddings from "../embeddings.js";
 import type * as places from "../places.js";
 import type * as preferences from "../preferences.js";
 import type * as seedData from "../seedData.js";
+import type * as semanticSearch from "../semanticSearch.js";
 
 import type {
   ApiFromModules,
@@ -23,9 +25,11 @@ import type {
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
   conversations: typeof conversations;
+  embeddings: typeof embeddings;
   places: typeof places;
   preferences: typeof preferences;
   seedData: typeof seedData;
+  semanticSearch: typeof semanticSearch;
 }>;
 
 /**

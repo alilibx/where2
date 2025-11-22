@@ -22,6 +22,7 @@ const getOpenAIClient = () => {
 // Define the structured output schema for search intent
 const searchIntentSchema = {
   type: "object",
+  additionalProperties: false,
   properties: {
     intent: {
       type: "string",
@@ -29,6 +30,7 @@ const searchIntentSchema = {
     },
     filters: {
       type: "object",
+      additionalProperties: false,
       properties: {
         category: {
           type: "string",
