@@ -1,6 +1,24 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
+import OpenAI from "openai";
+
+// Initialize OpenAI client configured for OpenRouter
+const getOpenAIClient = () => {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY environment variable is not set");
+  }
+
+  return new OpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey: apiKey,
+    defaultHeaders: {
+      "HTTP-Referer": process.env.APP_URL || "http://localhost:3000",
+      "X-Title": "Where2 Dubai",
+    },
+  });
+};
 
 /**
  * Semantic search using vector similarity
@@ -24,19 +42,21 @@ export const semanticSearch = action({
     userLat: v.optional(v.number()),
     userLon: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<any> => {
     const limit = args.limit || 50;
 
-    // Generate embedding for the query
-    const queryEmbeddingResult = await ctx.runAction(api.embeddings.generateQueryEmbedding, {
-      query: args.query,
+    // Generate embedding for the query inline
+    const client = getOpenAIClient();
+    const embeddingResponse = await client.embeddings.create({
+      model: "openai/text-embedding-3-small",
+      input: args.query,
     });
 
-    const queryEmbedding = queryEmbeddingResult.embedding;
+    const queryEmbedding: number[] = embeddingResponse.data[0].embedding;
 
     // Build filter expression for vector search
     const filterExpression = (q: any) => {
-      const conditions = [];
+      const conditions: any[] = [];
 
       if (args.filters?.category) {
         conditions.push(q.eq("category", args.filters.category));
@@ -55,23 +75,23 @@ export const semanticSearch = action({
     };
 
     // Perform vector search
-    const vectorResults = await ctx.vectorSearch("places", "by_semantic_search", {
+    const vectorResults: any[] = await ctx.vectorSearch("places", "by_semantic_search", {
       vector: queryEmbedding,
       limit,
       filter: filterExpression,
     });
 
     // Enrich results with full place data and scoring
-    const enrichedResults = await Promise.all(
-      vectorResults.map(async (result) => {
-        const place = await ctx.runQuery(api.places.getPlaceById, {
+    const enrichedResults: any[] = await Promise.all(
+      vectorResults.map(async (result: any) => {
+        const place: any = await ctx.runQuery(api.places.getPlaceById, {
           placeId: result._id,
         });
 
         if (!place) return null;
 
         // Calculate distance if user location provided
-        let distance = undefined;
+        let distance: number | undefined = undefined;
         if (args.userLat !== undefined && args.userLon !== undefined) {
           distance = calculateDistance(
             args.userLat,
@@ -82,12 +102,12 @@ export const semanticSearch = action({
         }
 
         // Calculate combined score
-        const semanticScore = result._score; // Cosine similarity (-1 to 1)
-        const distanceScore = distance !== undefined ? 1 / (1 + distance / 10) : 0.5; // Normalize distance
-        const ratingScore = place.rating / 5; // Normalize rating
+        const semanticScore: number = result._score; // Cosine similarity (-1 to 1)
+        const distanceScore: number = distance !== undefined ? 1 / (1 + distance / 10) : 0.5; // Normalize distance
+        const ratingScore: number = place.rating / 5; // Normalize rating
 
         // Weighted scoring: 60% semantic, 25% distance, 15% rating
-        const combinedScore =
+        const combinedScore: number =
           0.6 * ((semanticScore + 1) / 2) + // Convert -1..1 to 0..1
           0.25 * distanceScore +
           0.15 * ratingScore;
@@ -102,26 +122,26 @@ export const semanticSearch = action({
     );
 
     // Filter out nulls and apply additional filters
-    let filteredResults = enrichedResults.filter((r) => r !== null);
+    let filteredResults: any[] = enrichedResults.filter((r: any) => r !== null);
 
     // Apply tag filters (post-filter since tags not in vector index)
     if (args.filters?.tags && args.filters.tags.length > 0) {
-      filteredResults = filteredResults.filter((place) =>
-        args.filters!.tags!.some((tag) => place.tags.includes(tag))
+      filteredResults = filteredResults.filter((place: any) =>
+        args.filters!.tags!.some((tag: string) => place.tags.includes(tag))
       );
     }
 
     // Apply cuisine filters
     if (args.filters?.cuisine && args.filters.cuisine.length > 0) {
-      filteredResults = filteredResults.filter((place) =>
-        args.filters!.cuisine!.some((cuisine) => place.cuisine.includes(cuisine))
+      filteredResults = filteredResults.filter((place: any) =>
+        args.filters!.cuisine!.some((cuisine: string) => place.cuisine.includes(cuisine))
       );
     }
 
     // Apply minimum rating filter
     if (args.filters?.minRating) {
       filteredResults = filteredResults.filter(
-        (place) => place.rating >= args.filters!.minRating!
+        (place: any) => place.rating >= args.filters!.minRating!
       );
     }
 
@@ -144,7 +164,7 @@ export const semanticSearch = action({
         timeZone: "Asia/Dubai",
       });
 
-      filteredResults = filteredResults.filter((place) => {
+      filteredResults = filteredResults.filter((place: any) => {
         const hours = (place.openingHours as any)[dayOfWeek];
         if (!hours || hours === "Closed") return false;
 
@@ -154,10 +174,10 @@ export const semanticSearch = action({
     }
 
     // Sort by combined score
-    filteredResults.sort((a, b) => b.combinedScore - a.combinedScore);
+    filteredResults.sort((a: any, b: any) => b.combinedScore - a.combinedScore);
 
     // Find best match
-    const bestMatch = filteredResults.length > 0 ? filteredResults[0] : null;
+    const bestMatch: any = filteredResults.length > 0 ? filteredResults[0] : null;
 
     return {
       places: filteredResults,

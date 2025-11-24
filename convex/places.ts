@@ -305,7 +305,7 @@ export const getAreas = query({
   args: {},
   handler: async (ctx) => {
     const places = await ctx.db.query("places").collect();
-    const areas = [...new Set(places.map(p => p.area))];
+    const areas = Array.from(new Set(places.map(p => p.area)));
     return areas.sort();
   },
 });

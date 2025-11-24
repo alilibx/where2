@@ -114,19 +114,32 @@ export const updatePlaceEmbedding = internalMutation({
 });
 
 /**
- * Batch generate embeddings for all places without embeddings
+ * Internal query to get places without embeddings
  */
-export const batchGenerateEmbeddings = internalAction({
+export const getPlacesWithoutEmbeddings = internalQuery({
+  args: {
+    limit: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const allPlaces = await ctx.db.query("places").collect();
+    const placesWithoutEmbeddings = allPlaces.filter((place) => !place.embedding);
+    return placesWithoutEmbeddings.slice(0, args.limit);
+  },
+});
+
+/**
+ * Public action to trigger batch embedding generation
+ */
+export const triggerBatchEmbeddings = action({
   args: {
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ total: number; successful: number; failed: number; results: any[] }> => {
     const limit = args.limit || 100;
 
-    // Get places without embeddings
-    const places = await ctx.runQuery(internal.embeddings.getPlacesWithoutEmbeddings, {
-      limit,
-    });
+    // Get all places
+    const allPlaces: any = await ctx.runQuery(api.places.searchPlaces, {});
+    const places: any[] = allPlaces.places.filter((place: any) => !place.embedding).slice(0, limit);
 
     console.log(`Found ${places.length} places without embeddings`);
 
@@ -150,38 +163,10 @@ export const batchGenerateEmbeddings = internalAction({
 
     return {
       total: places.length,
-      successful: results.filter((r) => r.success).length,
-      failed: results.filter((r) => !r.success).length,
+      successful: results.filter((r: any) => r.success).length,
+      failed: results.filter((r: any) => !r.success).length,
       results,
     };
-  },
-});
-
-/**
- * Internal query to get places without embeddings
- */
-export const getPlacesWithoutEmbeddings = internalQuery({
-  args: {
-    limit: v.number(),
-  },
-  handler: async (ctx, args) => {
-    const allPlaces = await ctx.db.query("places").collect();
-    const placesWithoutEmbeddings = allPlaces.filter((place) => !place.embedding);
-    return placesWithoutEmbeddings.slice(0, args.limit);
-  },
-});
-
-/**
- * Public action to trigger batch embedding generation
- */
-export const triggerBatchEmbeddings = action({
-  args: {
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.runAction(internal.embeddings.batchGenerateEmbeddings, {
-      limit: args.limit || 100,
-    });
   },
 });
 
