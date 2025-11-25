@@ -357,7 +357,7 @@ export const getPlaceByGoogleId = query({
  * Only stores place_id + reference data (ToS compliant)
  * Custom enrichment (tags, metro info, etc.) added later via admin interface
  */
-export const createPlaceholder = internalMutation({
+export const createPlaceholder = mutation({
   args: {
     googlePlaceId: v.string(),
     name: v.string(),
@@ -483,5 +483,131 @@ export const getPlacesNeedingRefresh = query({
     );
 
     return needsRefresh;
+  },
+});
+
+/**
+ * Get places with Google Place ID for batch sync
+ */
+export const getPlacesWithGoogleId = query({
+  args: {
+    limit: v.optional(v.number()),
+    skipSynced: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 50;
+    const skipSynced = args.skipSynced ?? false;
+
+    // Get all places with googlePlaceId
+    const places = await ctx.db.query("places").collect();
+
+    let filtered = places.filter((p) => p.googlePlaceId);
+
+    // Optionally skip already synced places (have googlePhotos or googleSummary)
+    if (skipSynced) {
+      filtered = filtered.filter(
+        (p) => !p.googlePhotos || p.googlePhotos.length === 0
+      );
+    }
+
+    return filtered.slice(0, limit);
+  },
+});
+
+/**
+ * Update place with full Google data from sync
+ */
+export const updatePlaceFromGoogle = mutation({
+  args: {
+    placeId: v.id("places"),
+    // Basic info
+    rating: v.optional(v.number()),
+    userRatingCount: v.optional(v.number()),
+    // Contact
+    phone: v.optional(v.union(v.string(), v.null())),
+    website: v.optional(v.union(v.string(), v.null())),
+    // Price
+    priceLevel: v.optional(v.string()),
+    // Cuisine
+    cuisine: v.optional(v.array(v.string())),
+    // Photos
+    googlePhotos: v.optional(v.array(v.string())),
+    // Google AI summary
+    googleSummary: v.optional(v.union(v.string(), v.null())),
+    // Raw Google types
+    googleTypes: v.optional(v.array(v.string())),
+    // Restaurant attributes
+    outdoorSeating: v.optional(v.union(v.boolean(), v.null())),
+    goodForGroups: v.optional(v.union(v.boolean(), v.null())),
+    goodForChildren: v.optional(v.union(v.boolean(), v.null())),
+    liveMusic: v.optional(v.union(v.boolean(), v.null())),
+    reservable: v.optional(v.union(v.boolean(), v.null())),
+    // Service options
+    dineIn: v.optional(v.union(v.boolean(), v.null())),
+    takeout: v.optional(v.union(v.boolean(), v.null())),
+    delivery: v.optional(v.union(v.boolean(), v.null())),
+    // Menu offerings
+    servesBreakfast: v.optional(v.union(v.boolean(), v.null())),
+    servesBrunch: v.optional(v.union(v.boolean(), v.null())),
+    servesLunch: v.optional(v.union(v.boolean(), v.null())),
+    servesDinner: v.optional(v.union(v.boolean(), v.null())),
+    servesBeer: v.optional(v.union(v.boolean(), v.null())),
+    servesWine: v.optional(v.union(v.boolean(), v.null())),
+    servesCocktails: v.optional(v.union(v.boolean(), v.null())),
+    servesVegetarianFood: v.optional(v.union(v.boolean(), v.null())),
+    // Sync timestamp
+    lastGoogleSync: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { placeId, ...updates } = args;
+
+    // Get current place to merge cuisines
+    const place = await ctx.db.get(placeId);
+    if (!place) {
+      throw new Error("Place not found");
+    }
+
+    // Build update object, filtering out undefined values
+    const validUpdates: Record<string, any> = {};
+
+    // Handle simple fields
+    if (updates.rating !== undefined) validUpdates.rating = updates.rating;
+    if (updates.userRatingCount !== undefined) validUpdates.userRatingCount = updates.userRatingCount;
+    if (updates.phone !== undefined && updates.phone !== null) validUpdates.phone = updates.phone;
+    if (updates.website !== undefined && updates.website !== null) validUpdates.website = updates.website;
+    if (updates.priceLevel !== undefined) validUpdates.priceLevel = updates.priceLevel;
+    if (updates.googlePhotos !== undefined) validUpdates.googlePhotos = updates.googlePhotos;
+    if (updates.googleSummary !== undefined && updates.googleSummary !== null) validUpdates.googleSummary = updates.googleSummary;
+    if (updates.googleTypes !== undefined) validUpdates.googleTypes = updates.googleTypes;
+    if (updates.lastGoogleSync !== undefined) validUpdates.lastGoogleSync = updates.lastGoogleSync;
+
+    // Merge cuisines (keep existing, add new from Google)
+    if (updates.cuisine && updates.cuisine.length > 0) {
+      const existingCuisines = place.cuisine || [];
+      const allCuisines = Array.from(new Set([...existingCuisines, ...updates.cuisine]));
+      validUpdates.cuisine = allCuisines;
+    }
+
+    // Handle boolean fields (only set if not null)
+    const booleanFields = [
+      'outdoorSeating', 'goodForGroups', 'goodForChildren', 'liveMusic', 'reservable',
+      'dineIn', 'takeout', 'delivery',
+      'servesBreakfast', 'servesBrunch', 'servesLunch', 'servesDinner',
+      'servesBeer', 'servesWine', 'servesCocktails', 'servesVegetarianFood',
+    ] as const;
+
+    for (const field of booleanFields) {
+      const value = updates[field];
+      if (value !== undefined && value !== null) {
+        validUpdates[field] = value;
+      }
+    }
+
+    // Apply updates
+    validUpdates.lastUpdated = Date.now();
+
+    await ctx.db.patch(placeId, validUpdates);
+
+    return { success: true, updated: Object.keys(validUpdates) };
   },
 });

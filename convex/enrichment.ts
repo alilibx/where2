@@ -252,6 +252,95 @@ export const autoApplyHighConfidenceSuggestions = action({
  * Generate area suggestions based on coordinates
  * Uses Dubai's known neighborhoods
  */
+/**
+ * Batch enrich and apply suggestions for multiple venues
+ * Combines suggestion generation, area assignment, and application in one step
+ */
+export const batchEnrichAndApply = action({
+  args: {
+    limit: v.optional(v.number()),
+    confidenceThreshold: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 10;
+    const threshold = args.confidenceThreshold || 75;
+
+    // Get unenriched places
+    const places: any[] = await ctx.runQuery(api.places.getUnenrichedPlaces, { limit });
+
+    const results = [];
+    for (const place of places) {
+      try {
+        // Get AI suggestions
+        const suggestion: any = await ctx.runAction(api.enrichment.suggestEnrichment, {
+          placeId: place._id,
+          includeReviews: false,
+        });
+
+        if (!suggestion.success) {
+          results.push({ placeId: place._id, name: place.name, success: false, error: suggestion.error });
+          continue;
+        }
+
+        // Get area suggestion based on coordinates
+        const areaSuggestion: any = await ctx.runAction(api.enrichment.suggestArea, {
+          latitude: place.latitude,
+          longitude: place.longitude,
+        });
+
+        // Build updates based on threshold
+        const updates: any = {};
+        const s = suggestion.suggestions;
+
+        if (s.tagConfidence >= threshold) {
+          updates.tags = s.suggestedTags;
+        }
+        if (s.noiseLevelConfidence >= threshold) {
+          updates.noise = s.noiseLevel;
+        }
+        if (s.priceLevelConfidence >= threshold) {
+          updates.priceLevel = s.priceLevel;
+        }
+        if (s.highlightsConfidence >= threshold) {
+          updates.highlights = s.highlights;
+        }
+        if (areaSuggestion.confidence >= 60) {
+          updates.area = areaSuggestion.suggestedArea;
+        }
+
+        // Apply updates
+        if (Object.keys(updates).length > 0) {
+          await ctx.runMutation(api.places.updatePlaceEnrichment, {
+            placeId: place._id,
+            ...updates,
+          });
+        }
+
+        results.push({
+          placeId: place._id,
+          name: place.name,
+          success: true,
+          applied: Object.keys(updates),
+          suggestions: s,
+          area: areaSuggestion.suggestedArea,
+        });
+
+        // Add delay to avoid rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      } catch (error: any) {
+        results.push({ placeId: place._id, name: place.name, success: false, error: error.message });
+      }
+    }
+
+    return {
+      success: true,
+      processed: results.length,
+      enriched: results.filter(r => r.success && (r as any).applied?.length > 0).length,
+      results,
+    };
+  },
+});
+
 export const suggestArea = action({
   args: {
     latitude: v.number(),
@@ -271,6 +360,7 @@ export const suggestArea = action({
       { name: "Jumeirah", lat: 25.2252, lon: 55.2557, radius: 3 },
       { name: "Deira", lat: 25.2726, lon: 55.3258, radius: 3 },
       { name: "Bur Dubai", lat: 25.2575, lon: 55.2981, radius: 2 },
+      { name: "Dubai Silicon Oasis", lat: 25.1212, lon: 55.3773, radius: 2.5 },
     ];
 
     // Calculate distance to each area center

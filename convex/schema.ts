@@ -61,6 +61,34 @@ export default defineSchema({
     lastUpdated: v.number(), // timestamp
     enrichmentComplete: v.optional(v.boolean()), // Has custom tags been added?
 
+    // Google-sourced data (synced from Places API)
+    googlePhotos: v.optional(v.array(v.string())), // Photo URLs from Google
+    googleSummary: v.optional(v.string()), // AI-generated summary from Google
+    googleTypes: v.optional(v.array(v.string())), // Raw Google place types
+    userRatingCount: v.optional(v.number()), // Number of Google reviews
+
+    // Restaurant attributes (from Google Places API)
+    outdoorSeating: v.optional(v.boolean()),
+    goodForGroups: v.optional(v.boolean()),
+    goodForChildren: v.optional(v.boolean()),
+    liveMusic: v.optional(v.boolean()),
+    reservable: v.optional(v.boolean()),
+
+    // Service options (from Google Places API)
+    dineIn: v.optional(v.boolean()),
+    takeout: v.optional(v.boolean()),
+    delivery: v.optional(v.boolean()),
+
+    // Menu offerings (from Google Places API)
+    servesBreakfast: v.optional(v.boolean()),
+    servesBrunch: v.optional(v.boolean()),
+    servesLunch: v.optional(v.boolean()),
+    servesDinner: v.optional(v.boolean()),
+    servesBeer: v.optional(v.boolean()),
+    servesWine: v.optional(v.boolean()),
+    servesCocktails: v.optional(v.boolean()),
+    servesVegetarianFood: v.optional(v.boolean()),
+
     // Vector search (semantic search)
     embedding: v.optional(v.array(v.float64())), // 1536 dimensions (OpenAI text-embedding-3-small)
     embeddingModel: v.optional(v.string()), // e.g., "text-embedding-3-small"
