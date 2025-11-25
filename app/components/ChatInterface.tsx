@@ -188,7 +188,7 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
           alignItems: "center",
         }}
       >
-        <h3 style={{ fontSize: 15, fontWeight: 600 }}>Chat with Where2</h3>
+        <h3 style={{ fontSize: 15, fontWeight: 600 }}>Chat with Mouoj</h3>
         <button
           onClick={handleClear}
           className="btn btn-ghost btn-icon"

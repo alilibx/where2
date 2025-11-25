@@ -175,7 +175,7 @@ export default function Home() {
               }}
             >
               <MapPin size={20} strokeWidth={2.5} />
-              <span style={{ fontSize: 17, fontWeight: 600 }}>Where2</span>
+              <span style={{ fontSize: 17, fontWeight: 600 }}>Mouoj</span>
             </div>
 
             {/* Mode Toggle */}

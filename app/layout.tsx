@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Where2 — Dubai City Guide",
+  title: "Mouoj — Dubai City Guide",
   description: "Voice-first, hyper-filtered city guide for Dubai",
 };
 

@@ -1,5 +1,5 @@
 {
-  "name": "where2-dubai",
+  "name": "mouoj",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -11,7 +11,10 @@
     "convex:deploy": "convex deploy"
   },
   "dependencies": {
+    "@auth/core": "0.37.0",
     "@convex-dev/action-cache": "^0.3.0",
+    "@convex-dev/auth": "^0.0.90",
+    "@convex-dev/ratelimiter": "^0.1.7",
     "convex": "^1.16.0",
     "convex-helpers": "^0.1.106",
     "lucide-react": "^0.436.0",
