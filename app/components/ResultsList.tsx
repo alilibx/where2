@@ -11,7 +11,7 @@ interface Place {
   rating: number;
   priceLevel: string;
   distance: number;
-  isOpen: boolean;
+  isOpen: boolean | null; // null when opening hours not available (e.g., Google-sourced venues)
   reasons: string;
   area: string;
   cuisine: string[];

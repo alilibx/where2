@@ -33,9 +33,9 @@ const searchIntentSchema = {
       additionalProperties: false,
       properties: {
         category: {
-          type: "string",
-          enum: ["cafe", "restaurant", "any"],
-          description: "Type of venue",
+          type: ["string", "null"],
+          enum: ["cafe", "restaurant", "any", null],
+          description: "Type of venue (null if not specified)",
         },
         tags: {
           type: "array",
@@ -52,23 +52,21 @@ const searchIntentSchema = {
           description: "Venue characteristics",
         },
         priceLevel: {
-          type: "string",
-          enum: ["Low", "Mid", "High", "Lux"],
-          description: "Price range",
+          type: ["string", "null"],
+          enum: ["Low", "Mid", "High", "Lux", null],
+          description: "Price range (null if not specified)",
         },
         area: {
-          type: "string",
-          description: "Area or neighborhood in Dubai",
+          type: ["string", "null"],
+          description: "Area or neighborhood in Dubai (null if not specified)",
         },
         nearMetro: {
-          type: "boolean",
-          description: "Whether venue should be near a Metro station",
+          type: ["boolean", "null"],
+          description: "Whether venue should be near a Metro station (null if not specified)",
         },
         minRating: {
-          type: "number",
-          minimum: 0,
-          maximum: 5,
-          description: "Minimum rating (0-5)",
+          type: ["number", "null"],
+          description: "Minimum rating 0-5 (null if not specified)",
         },
         cuisine: {
           type: "array",
@@ -78,16 +76,16 @@ const searchIntentSchema = {
           description: "Types of cuisine",
         },
         noise: {
-          type: "string",
-          enum: ["Quiet", "Moderate", "Lively"],
-          description: "Atmosphere noise level",
+          type: ["string", "null"],
+          enum: ["Quiet", "Moderate", "Lively", null],
+          description: "Atmosphere noise level (null if not specified)",
         },
         openNow: {
           type: "boolean",
           description: "Whether venue must be open now",
         },
       },
-      required: ["tags", "cuisine", "openNow"],
+      required: ["category", "tags", "priceLevel", "area", "nearMetro", "minRating", "cuisine", "noise", "openNow"],
     },
     clarifyingQuestions: {
       type: "array",

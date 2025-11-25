@@ -298,33 +298,35 @@ export default function PlaceDetailsPage() {
             </div>
 
             {/* Opening Hours */}
-            <div className="card" style={{ marginBottom: "24px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-                <Clock size={20} />
-                <h3 style={{ fontSize: "20px", fontWeight: "600" }}>Opening Hours</h3>
+            {place.openingHours && (
+              <div className="card" style={{ marginBottom: "24px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                  <Clock size={20} />
+                  <h3 style={{ fontSize: "20px", fontWeight: "600" }}>Opening Hours</h3>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {days.map((day) => (
+                    <div
+                      key={day}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        padding: "8px",
+                        background: day === today ? "#e0e7ff" : "transparent",
+                        borderRadius: "6px",
+                      }}
+                    >
+                      <span style={{ fontWeight: day === today ? "600" : "400", textTransform: "capitalize" }}>
+                        {day}
+                      </span>
+                      <span style={{ color: "#666" }}>
+                        {place.openingHours![day as keyof typeof place.openingHours]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {days.map((day) => (
-                  <div
-                    key={day}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      padding: "8px",
-                      background: day === today ? "#e0e7ff" : "transparent",
-                      borderRadius: "6px",
-                    }}
-                  >
-                    <span style={{ fontWeight: day === today ? "600" : "400", textTransform: "capitalize" }}>
-                      {day}
-                    </span>
-                    <span style={{ color: "#666" }}>
-                      {place.openingHours[day as keyof typeof place.openingHours]}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            )}
 
             {/* Additional Info */}
             {place.seatingTypes && place.seatingTypes.length > 0 && (

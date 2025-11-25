@@ -66,17 +66,18 @@ export default function Home() {
     setSearchQuery(intent || query);
 
     // If AI provided filters, merge them with existing filters
+    // Note: AI returns null for unspecified fields, treat null same as undefined
     if (aiFilters) {
       setFilters({
-        category: aiFilters.category || filters.category,
-        tags: aiFilters.tags || filters.tags,
-        priceLevel: aiFilters.priceLevel || filters.priceLevel,
-        area: aiFilters.area || filters.area,
-        nearMetro: aiFilters.nearMetro !== undefined ? aiFilters.nearMetro : filters.nearMetro,
-        minRating: aiFilters.minRating || filters.minRating,
-        cuisine: aiFilters.cuisine || filters.cuisine,
-        noise: aiFilters.noise || filters.noise,
-        openNow: aiFilters.openNow !== undefined ? aiFilters.openNow : filters.openNow,
+        category: aiFilters.category ?? filters.category,
+        tags: aiFilters.tags ?? filters.tags,
+        priceLevel: aiFilters.priceLevel ?? filters.priceLevel,
+        area: aiFilters.area ?? filters.area,
+        nearMetro: aiFilters.nearMetro ?? filters.nearMetro,
+        minRating: aiFilters.minRating ?? filters.minRating,
+        cuisine: aiFilters.cuisine ?? filters.cuisine,
+        noise: aiFilters.noise ?? filters.noise,
+        openNow: aiFilters.openNow ?? filters.openNow,
       });
     }
 

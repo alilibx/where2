@@ -1,9 +1,15 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
-import { Doc, Id } from "./_generated/dataModel";
+import { query, mutation, internalMutation } from "./_generated/server";
+import { Doc } from "./_generated/dataModel";
 
 // Helper to check if a place is open at a given time
-function isOpenAt(place: Doc<"places">, time: Date): boolean {
+// Returns null if opening hours are not available (e.g., Google-sourced venues without stored hours)
+function isOpenAt(place: Doc<"places">, time: Date): boolean | null {
+  // If no opening hours stored, return null (fetch from Google in real-time)
+  if (!place.openingHours) {
+    return null;
+  }
+
   const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
   const dayName = days[time.getDay()] as keyof typeof place.openingHours;
   const hours = place.openingHours[dayName];
@@ -120,7 +126,10 @@ export const searchPlaces = query({
     }
 
     if (args.openNow) {
-      places = places.filter(p => isOpenAt(p, now));
+      places = places.filter(p => {
+        const open = isOpenAt(p, now);
+        return open === true; // Only include confirmed open places, skip unknowns (null)
+      });
     }
 
     // Get user preferences if userId provided
@@ -273,7 +282,7 @@ export const addPlace = mutation({
     priceLevel: v.string(),
     rating: v.number(),
     noise: v.optional(v.string()),
-    openingHours: v.object({
+    openingHours: v.optional(v.object({
       monday: v.string(),
       tuesday: v.string(),
       wednesday: v.string(),
@@ -281,7 +290,7 @@ export const addPlace = mutation({
       friday: v.string(),
       saturday: v.string(),
       sunday: v.string(),
-    }),
+    })),
     phone: v.optional(v.string()),
     bookingUrl: v.optional(v.string()),
     website: v.optional(v.string()),
@@ -289,10 +298,13 @@ export const addPlace = mutation({
     parkingNote: v.optional(v.string()),
     seatingTypes: v.optional(v.array(v.string())),
     category: v.string(),
+    googlePlaceId: v.optional(v.string()),
+    dataSource: v.optional(v.string()), // "manual", "google", "hybrid"
   },
   handler: async (ctx, args) => {
     const placeId = await ctx.db.insert("places", {
       ...args,
+      dataSource: args.dataSource || "manual", // Default to manual if not specified
       verified: false,
       lastUpdated: Date.now(),
     });
@@ -318,5 +330,158 @@ export const getCuisines = query({
     const cuisines = new Set<string>();
     places.forEach(p => p.cuisine.forEach(c => cuisines.add(c)));
     return Array.from(cuisines).sort();
+  },
+});
+
+// ============================================================================
+// Google Places Integration Helper Functions
+// ============================================================================
+
+/**
+ * Get a place by Google Place ID
+ * Used to check if a place_id already exists in database
+ */
+export const getPlaceByGoogleId = query({
+  args: { googlePlaceId: v.string() },
+  handler: async (ctx, args) => {
+    const place = await ctx.db
+      .query("places")
+      .withIndex("by_google_place_id", (q) => q.eq("googlePlaceId", args.googlePlaceId))
+      .first();
+    return place;
+  },
+});
+
+/**
+ * Create a minimal venue placeholder from Google discovery
+ * Only stores place_id + reference data (ToS compliant)
+ * Custom enrichment (tags, metro info, etc.) added later via admin interface
+ */
+export const createPlaceholder = internalMutation({
+  args: {
+    googlePlaceId: v.string(),
+    name: v.string(),
+    latitude: v.number(),
+    longitude: v.number(),
+    category: v.string(),
+    dataSource: v.string(), // "manual", "google", "hybrid"
+  },
+  handler: async (ctx, args) => {
+    // Create minimal placeholder
+    const placeId = await ctx.db.insert("places", {
+      googlePlaceId: args.googlePlaceId,
+      dataSource: args.dataSource,
+      lastGoogleSync: Date.now(),
+      name: args.name,
+      latitude: args.latitude,
+      longitude: args.longitude,
+      area: "Unknown", // To be enriched manually
+      category: args.category,
+      coverImage: "", // To be enriched
+      gallery: [],
+      tags: [], // CUSTOM - to be enriched
+      cuisine: [], // To be enriched
+      priceLevel: "Mid", // Default, to be enriched
+      rating: 0, // Will be fetched live from Google
+      nearMetro: false, // CUSTOM - to be enriched
+      highlights: "", // CUSTOM - to be enriched
+      verified: false,
+      lastUpdated: Date.now(),
+      enrichmentComplete: false,
+    });
+    return placeId;
+  },
+});
+
+/**
+ * Update Google Place ID for a venue (refresh annually)
+ */
+export const updatePlaceGoogleId = internalMutation({
+  args: {
+    placeId: v.id("places"),
+    googlePlaceId: v.string(),
+    lastGoogleSync: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.placeId, {
+      googlePlaceId: args.googlePlaceId,
+      lastGoogleSync: args.lastGoogleSync,
+    });
+  },
+});
+
+/**
+ * Update venue enrichment data (custom tags, metro info, etc.)
+ * Used by admin interface to add custom value-add data
+ */
+export const updatePlaceEnrichment = mutation({
+  args: {
+    placeId: v.id("places"),
+    tags: v.optional(v.array(v.string())),
+    noise: v.optional(v.string()),
+    nearMetro: v.optional(v.boolean()),
+    metroStation: v.optional(v.string()),
+    metroWalkTime: v.optional(v.number()),
+    area: v.optional(v.string()),
+    cuisine: v.optional(v.array(v.string())),
+    priceLevel: v.optional(v.string()),
+    highlights: v.optional(v.string()),
+    parkingNote: v.optional(v.string()),
+    seatingTypes: v.optional(v.array(v.string())),
+    coverImage: v.optional(v.string()),
+    gallery: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const { placeId, ...updates } = args;
+
+    // Filter out undefined values
+    const validUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, value]) => value !== undefined)
+    );
+
+    await ctx.db.patch(placeId, {
+      ...validUpdates,
+      enrichmentComplete: true,
+      lastUpdated: Date.now(),
+    } as any);
+  },
+});
+
+/**
+ * Get unenriched venues (for admin enrichment interface)
+ */
+export const getUnenrichedPlaces = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 50;
+
+    const places = await ctx.db
+      .query("places")
+      .withIndex("by_enrichment_status", (q) => q.eq("enrichmentComplete", false))
+      .take(limit);
+
+    return places;
+  },
+});
+
+/**
+ * Get places that need Google Place ID refresh (older than 12 months)
+ */
+export const getPlacesNeedingRefresh = query({
+  args: {},
+  handler: async (ctx) => {
+    const oneYearAgo = Date.now() - (365 * 24 * 60 * 60 * 1000);
+
+    const places = await ctx.db.query("places").collect();
+
+    const needsRefresh = places.filter(
+      (p) =>
+        p.googlePlaceId &&
+        (!p.lastGoogleSync || p.lastGoogleSync < oneYearAgo)
+    );
+
+    return needsRefresh;
   },
 });

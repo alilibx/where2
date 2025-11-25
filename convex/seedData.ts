@@ -380,7 +380,10 @@ export const seedPlaces = mutation({
     ];
 
     for (const place of places) {
-      await ctx.db.insert("places", place);
+      await ctx.db.insert("places", {
+        ...place,
+        dataSource: "manual", // All seed data is manually curated
+      });
     }
 
     return { message: `Seeded ${places.length} places successfully` };

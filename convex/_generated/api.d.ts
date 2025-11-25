@@ -11,6 +11,9 @@
 import type * as ai from "../ai.js";
 import type * as conversations from "../conversations.js";
 import type * as embeddings from "../embeddings.js";
+import type * as enrichment from "../enrichment.js";
+import type * as feedback from "../feedback.js";
+import type * as googlePlaces from "../googlePlaces.js";
 import type * as places from "../places.js";
 import type * as preferences from "../preferences.js";
 import type * as seedData from "../seedData.js";
@@ -26,6 +29,9 @@ declare const fullApi: ApiFromModules<{
   ai: typeof ai;
   conversations: typeof conversations;
   embeddings: typeof embeddings;
+  enrichment: typeof enrichment;
+  feedback: typeof feedback;
+  googlePlaces: typeof googlePlaces;
   places: typeof places;
   preferences: typeof preferences;
   seedData: typeof seedData;

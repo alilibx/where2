@@ -4,30 +4,38 @@ import { v } from "convex/values";
 export default defineSchema({
   // Places (venues) in Dubai
   places: defineTable({
+    // Google Places Integration (ToS Compliant - only place_id stored permanently)
+    googlePlaceId: v.optional(v.string()), // Google's unique identifier (can store indefinitely per ToS)
+    dataSource: v.optional(v.string()), // "manual", "google", "hybrid" - tracks data origin
+    lastGoogleSync: v.optional(v.number()), // Last time place_id was refreshed
+
     name: v.string(),
     nameAr: v.optional(v.string()), // Arabic name for bilingual support
     coverImage: v.string(),
     gallery: v.array(v.string()),
 
-    // Location
+    // Location (reference data - coordinates updated from Google as needed)
     latitude: v.number(),
     longitude: v.number(),
     area: v.string(), // e.g., "Marina", "Downtown", "Business Bay"
 
-    // Metro information
+    // Metro information (CUSTOM - not from Google, our unique value-add)
     nearMetro: v.boolean(),
     metroStation: v.optional(v.string()),
     metroWalkTime: v.optional(v.number()), // in minutes
 
-    // Core attributes
+    // Core attributes (CUSTOM - our enrichment, not Google data)
     tags: v.array(v.string()), // family-friendly, kid-friendly, outdoor, indoor, waterfront, etc.
     cuisine: v.array(v.string()),
-    priceLevel: v.string(), // "Low", "Mid", "High", "Lux"
-    rating: v.number(), // 0-5
-    noise: v.optional(v.string()), // "Quiet", "Moderate", "Lively"
+    priceLevel: v.string(), // "Low", "Mid", "High", "Lux" (more granular than Google's 4 levels)
+    rating: v.number(), // 0-5 (cached from Google, updated on sync)
+    noise: v.optional(v.string()), // "Quiet", "Moderate", "Lively" (CUSTOM attribute)
 
-    // Operational details
-    openingHours: v.object({
+    // Operational details (OPTIONAL - for backward compatibility with seed data)
+    // NOTE: For Google-sourced venues, hours/phone/website are fetched live (ToS compliant)
+    // For manually-added venues, these can be stored directly
+    // New Google venues will fetch this data in real-time
+    openingHours: v.optional(v.object({
       monday: v.string(),
       tuesday: v.string(),
       wednesday: v.string(),
@@ -35,22 +43,23 @@ export default defineSchema({
       friday: v.string(),
       saturday: v.string(),
       sunday: v.string(),
-    }),
+    })),
 
-    // Contact & booking
+    // Contact & booking (OPTIONAL - for backward compatibility)
     phone: v.optional(v.string()),
-    bookingUrl: v.optional(v.string()),
     website: v.optional(v.string()),
+    bookingUrl: v.optional(v.string()), // Custom booking integration (not from Google)
 
-    // Details
-    highlights: v.string(), // Short "why this place" summary
+    // Details (CUSTOM enrichment)
+    highlights: v.string(), // Curated "why this place" summary (our content, not Google's)
     parkingNote: v.optional(v.string()),
     seatingTypes: v.optional(v.array(v.string())), // high-chair, sofa, outdoor, etc.
 
     // Metadata
     category: v.string(), // cafe, restaurant, etc.
-    verified: v.boolean(),
+    verified: v.boolean(), // Manual verification flag
     lastUpdated: v.number(), // timestamp
+    enrichmentComplete: v.optional(v.boolean()), // Has custom tags been added?
 
     // Vector search (semantic search)
     embedding: v.optional(v.array(v.float64())), // 1536 dimensions (OpenAI text-embedding-3-small)
@@ -61,6 +70,9 @@ export default defineSchema({
   .index("by_category", ["category"])
   .index("by_rating", ["rating"])
   .index("by_near_metro", ["nearMetro"])
+  .index("by_google_place_id", ["googlePlaceId"])
+  .index("by_data_source", ["dataSource"])
+  .index("by_enrichment_status", ["enrichmentComplete"])
   .vectorIndex("by_semantic_search", {
     vectorField: "embedding",
     dimensions: 1536,
@@ -136,4 +148,19 @@ export default defineSchema({
   })
   .index("by_user", ["userId"])
   .index("by_last_message", ["lastMessage"]),
+
+  // User feedback for venue data quality (crowdsourcing improvements)
+  placeFeedback: defineTable({
+    placeId: v.id("places"),
+    userId: v.string(),
+    feedbackType: v.string(), // "incorrect_tags", "wrong_info", "venue_closed", "missing_data", "other"
+    description: v.string(), // User's explanation
+    status: v.string(), // "pending", "reviewed", "resolved", "dismissed"
+    reviewedBy: v.optional(v.string()), // Admin who reviewed
+    reviewNotes: v.optional(v.string()),
+    timestamp: v.number(),
+  })
+  .index("by_place", ["placeId"])
+  .index("by_status", ["status"])
+  .index("by_timestamp", ["timestamp"]),
 });
