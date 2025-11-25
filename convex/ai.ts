@@ -172,7 +172,7 @@ Default values:
 
     try {
       const completion = await client.chat.completions.create({
-        model: "openai/gpt-4o-2024-08-06", // Supports structured outputs
+        model: "openai/gpt-4o-mini", // Fast + supports structured outputs (100x cheaper, 6x faster)
         messages,
         response_format: {
           type: "json_schema",
@@ -366,3 +366,4 @@ Guidelines:
     }
   },
 });
+

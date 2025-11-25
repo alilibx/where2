@@ -14,6 +14,7 @@ import type * as embeddings from "../embeddings.js";
 import type * as enrichment from "../enrichment.js";
 import type * as feedback from "../feedback.js";
 import type * as googlePlaces from "../googlePlaces.js";
+import type * as hybridSearch from "../hybridSearch.js";
 import type * as places from "../places.js";
 import type * as preferences from "../preferences.js";
 import type * as seedData from "../seedData.js";
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   enrichment: typeof enrichment;
   feedback: typeof feedback;
   googlePlaces: typeof googlePlaces;
+  hybridSearch: typeof hybridSearch;
   places: typeof places;
   preferences: typeof preferences;
   seedData: typeof seedData;
@@ -64,4 +66,47 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  actionCache: {
+    crons: {
+      purge: FunctionReference<
+        "mutation",
+        "internal",
+        { expiresAt?: number },
+        null
+      >;
+    };
+    lib: {
+      get: FunctionReference<
+        "query",
+        "internal",
+        { args: any; name: string; ttl: number | null },
+        { kind: "hit"; value: any } | { expiredEntry?: string; kind: "miss" }
+      >;
+      put: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          args: any;
+          expiredEntry?: string;
+          name: string;
+          ttl: number | null;
+          value: any;
+        },
+        { cacheHit: boolean; deletedExpiredEntry: boolean }
+      >;
+      remove: FunctionReference<
+        "mutation",
+        "internal",
+        { args: any; name: string },
+        null
+      >;
+      removeAll: FunctionReference<
+        "mutation",
+        "internal",
+        { batchSize?: number; before?: number; name?: string },
+        null
+      >;
+    };
+  };
+};

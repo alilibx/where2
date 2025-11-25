@@ -611,3 +611,39 @@ export const updatePlaceFromGoogle = mutation({
     return { success: true, updated: Object.keys(validUpdates) };
   },
 });
+
+/**
+ * Fix coverImage by populating from googlePhotos for all places with empty coverImage
+ * Run this to repair places that have googlePhotos but no coverImage
+ */
+export const fixCoverImages = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const places = await ctx.db.query("places").collect();
+
+    let fixed = 0;
+    const fixedPlaces: string[] = [];
+
+    for (const place of places) {
+      // Check if coverImage is empty but googlePhotos has images
+      if (
+        (!place.coverImage || place.coverImage === "") &&
+        place.googlePhotos &&
+        place.googlePhotos.length > 0
+      ) {
+        await ctx.db.patch(place._id, {
+          coverImage: place.googlePhotos[0],
+          lastUpdated: Date.now(),
+        });
+        fixed++;
+        fixedPlaces.push(place.name);
+      }
+    }
+
+    return {
+      success: true,
+      fixed,
+      fixedPlaces,
+    };
+  },
+});

@@ -104,7 +104,7 @@ export default defineSchema({
   .vectorIndex("by_semantic_search", {
     vectorField: "embedding",
     dimensions: 1536,
-    filterFields: ["category", "priceLevel", "area", "nearMetro"],
+    filterFields: ["category", "priceLevel", "area", "nearMetro", "goodForChildren", "delivery"],
   }),
 
   // User preferences

@@ -1,7 +1,8 @@
-import { action } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { v } from "convex/values";
-import { api } from "./_generated/api";
+import { api, components, internal } from "./_generated/api";
 import OpenAI from "openai";
+import { ActionCache } from "@convex-dev/action-cache";
 
 // Initialize OpenAI client configured for OpenRouter
 const getOpenAIClient = () => {
@@ -19,6 +20,30 @@ const getOpenAIClient = () => {
     },
   });
 };
+
+// Query embedding cache - caches embeddings for 24 hours
+const queryEmbeddingCache = new ActionCache(components.actionCache, {
+  action: internal.semanticSearch.generateQueryEmbeddingInternal,
+  name: "queryEmbeddingV1",
+  ttl: 24 * 60 * 60 * 1000, // 24 hours
+});
+
+/**
+ * Internal action to generate query embedding (cached)
+ */
+export const generateQueryEmbeddingInternal = internalAction({
+  args: {
+    query: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const client = getOpenAIClient();
+    const response = await client.embeddings.create({
+      model: "openai/text-embedding-3-small",
+      input: args.query,
+    });
+    return response.data[0].embedding;
+  },
+});
 
 /**
  * Semantic search using vector similarity
@@ -45,14 +70,10 @@ export const semanticSearch = action({
   handler: async (ctx, args): Promise<any> => {
     const limit = args.limit || 50;
 
-    // Generate embedding for the query inline
-    const client = getOpenAIClient();
-    const embeddingResponse = await client.embeddings.create({
-      model: "openai/text-embedding-3-small",
-      input: args.query,
+    // Get cached query embedding (or generate if not cached)
+    const queryEmbedding: number[] = await queryEmbeddingCache.fetch(ctx, {
+      query: args.query,
     });
-
-    const queryEmbedding: number[] = embeddingResponse.data[0].embedding;
 
     // Build filter expression for vector search
     const filterExpression = (q: any) => {
