@@ -61,20 +61,35 @@ Remove decision fatigue by matching a user's intent (mood, constraints, timing, 
 - ✅ Context awareness (time, weather, location)
 - ✅ 24-hour embedding cache for cost optimization
 
-### 🔄 Integration Opportunities
+### 🔄 Search Architecture
 
-**Semantic Search Enhancement**
-The project includes a fully-built semantic/vector search system (`semanticSearch.ts`) with:
-- Vector embeddings via OpenAI text-embedding-3-small (1536 dimensions)
-- Cosine similarity search with Convex vector index
-- Combined scoring: 60% semantic, 25% distance, 15% rating
-- Post-filtering for tags, cuisine, rating, openNow
+**Hybrid Search System (ACTIVE)**
+The project uses a sophisticated hybrid search system that combines multiple search strategies:
 
-**To activate:** Generate embeddings for all venues using `convex/embeddings.ts` and integrate `semanticSearch` into the main search flow alongside filter-based search.
+1. **Filter-Based Search** (`convex/places.ts`)
+   - Traditional filter matching (tags, cuisine, area, price, etc.)
+   - Context-aware scoring (weather, time, distance)
+   - User preference boosting
+
+2. **Semantic Search** (`convex/semanticSearch.ts`)
+   - Vector embeddings via OpenAI text-embedding-3-small (1536 dimensions)
+   - Cosine similarity search with Convex vector index
+   - Combined scoring: 60% semantic, 25% distance, 15% rating
+   - 24-hour query embedding cache for cost efficiency
+
+3. **Hybrid Search** (`convex/hybridSearch.ts`)
+   - Runs LLM parsing and semantic search in parallel
+   - Merges results with weighted scoring (60% semantic, 40% filter)
+   - Returns best of both worlds
+
+**To generate embeddings:**
+```bash
+npx convex run embeddings:triggerBatchEmbeddings
+```
 
 ## 🗺️ Google Places API Integration
 
-**Status: Infrastructure Complete | Phased Rollout Ready**
+**Status: Fully Implemented | Production Ready**
 
 The project includes a complete Google Places API integration system designed for **ToS compliance**, **cost optimization**, and **phased deployment**. This hybrid approach combines Google's fresh data with our custom Dubai-specific enrichment.
 
@@ -174,13 +189,16 @@ The project includes a complete Google Places API integration system designed fo
 - Filter by types: restaurant, cafe, bar, attraction
 - Search radius: 2-5km per Dubai area
 - Returns place_ids only (ToS compliant)
+- `createVenuePlaceholders`: Batch create venues from discovery
 
 **2. Place Details Fetching**
-- `fetchPlaceDetails`: Get fresh data for a specific place_id
+- `fetchPlaceDetails`: Get fresh data for a specific place_id (Enterprise + Atmosphere tier)
 - Field-optimized requests (only fetch what's needed)
 - Error handling for deleted/moved venues
 - `checkIsOpenNow`: Real-time opening status
-- `getPhotoUrl`: Generate photo URLs on-demand
+- `getPhotoUrl` / `fetchPhotoUrls`: Generate photo URLs on-demand
+- `syncVenueGoogleData`: Full sync for a single venue with photos
+- `syncFullGoogleData`: Batch sync all venues with rate limiting
 
 **3. AI-Assisted Enrichment (`convex/enrichment.ts`)**
 - `suggestEnrichment`: GPT-4o-mini analyzes venue and suggests custom tags
@@ -206,9 +224,12 @@ The project includes a complete Google Places API integration system designed fo
 **6. Admin Helper Functions (`convex/places.ts`)**
 - `createPlaceholder`: Create minimal venue from Google discovery
 - `updatePlaceEnrichment`: Add custom tags and metadata
+- `updatePlaceFromGoogle`: Full sync from Google data
 - `getUnenrichedPlaces`: List venues awaiting enrichment
+- `getPlacesWithGoogleId`: Get venues for batch sync
 - `refreshPlaceId`: Update place_id (recommended annually)
 - `getPlacesNeedingRefresh`: Find outdated place_ids
+- `fixCoverImages`: Repair venues with missing cover images
 
 ### Deployment Steps
 
@@ -306,21 +327,22 @@ npx convex dev  # Schema automatically deploys
 - [ ] Add Google logo where required
 - [ ] Link to Google Maps for navigation
 
-### Files Added
+### Files Added/Updated
 
 **Backend:**
-- `convex/googlePlaces.ts` - API integration (371 lines)
-- `convex/enrichment.ts` - AI-assisted tagging (327 lines)
-- `convex/feedback.ts` - User feedback system (254 lines)
-- `convex/places.ts` - Helper functions added (154 new lines)
-- `convex/schema.ts` - Updated with new fields and indexes
+- `convex/googlePlaces.ts` - Full Google Places API integration (~750 lines)
+- `convex/enrichment.ts` - AI-assisted tagging (~330 lines)
+- `convex/feedback.ts` - User feedback system (~250 lines)
+- `convex/places.ts` - Search + helper functions (~650 lines)
+- `convex/schema.ts` - 5 collections with vector indexes
+- `convex/semanticSearch.ts` - Vector search with caching (~240 lines)
+- `convex/hybridSearch.ts` - Combined search (~90 lines)
+- `convex/embeddings.ts` - Embedding generation (~200 lines)
+- `convex/convex.config.ts` - Action cache configuration
 
 **Frontend:**
-- `lib/placeDetailsCache.ts` - Client-side cache manager (415 lines)
-
-**Documentation:**
-- `docs/google-places-admin-guide.md` (to be created)
-- `docs/enrichment-guidelines.md` (to be created)
+- `lib/placeDetailsCache.ts` - Client-side cache manager (~420 lines)
+- `lib/searchCache.ts` - In-memory search cache (~130 lines)
 
 ### Next Steps for Frontend Integration
 
@@ -408,6 +430,10 @@ AI Parses:
 - **Frontend**: Next.js 14 (React 18) with TypeScript
 - **Backend**: Convex (serverless backend platform)
 - **AI/LLM**: OpenRouter API with GPT-4o (structured outputs)
+- **Embeddings**: OpenAI text-embedding-3-small (1536 dimensions)
+- **Vector Search**: Convex native vector indexes with cosine similarity
+- **Caching**: @convex-dev/action-cache for embedding cache
+- **External APIs**: Google Places API (New) for venue data
 - **Schema Validation**: Zod with JSON Schema
 - **Styling**: Custom CSS with responsive design
 - **Icons**: Lucide React
@@ -522,15 +548,22 @@ where2/
 │   └── ConvexClientProvider.tsx # Convex real-time backend provider
 ├── convex/                      # Convex serverless backend
 │   ├── schema.ts               # Database schema + vector indexes
-│   ├── places.ts               # Search, ranking, scoring algorithm
+│   ├── convex.config.ts        # App config with action-cache
+│   ├── places.ts               # Search, ranking, scoring, admin helpers
 │   ├── preferences.ts          # User preference learning & memory
 │   ├── conversations.ts        # Chat conversation management
 │   ├── ai.ts                   # OpenRouter/GPT-4o AI integration
 │   ├── embeddings.ts           # Vector embedding generation
 │   ├── semanticSearch.ts       # Semantic/vector similarity search
-│   └── seedData.ts             # Sample data seeder (150+ venues)
+│   ├── hybridSearch.ts         # Combined filter + semantic search
+│   ├── googlePlaces.ts         # Google Places API integration
+│   ├── enrichment.ts           # AI-assisted venue enrichment
+│   ├── feedback.ts             # User feedback system
+│   └── seedData.ts             # Sample data seeder
 ├── lib/                         # Utilities
-│   └── translations.ts         # Bilingual support (EN/AR)
+│   ├── translations.ts         # Bilingual support (EN/AR)
+│   ├── placeDetailsCache.ts    # Client-side Google data cache
+│   └── searchCache.ts          # In-memory search result cache
 ├── docs/                        # Project documentation
 │   └── mouoj_dubai_mvp_scope.md # MVP requirements & scope
 └── README.md                    # This file
@@ -539,15 +572,21 @@ where2/
 ## 🗄️ Data Model
 
 ### Places
-- Name, cover image, gallery
-- Location (lat/long, area)
-- Metro info (station, walk time)
-- Tags (family-friendly, outdoor, etc.)
-- Cuisine types
-- Price level, rating, noise
-- Opening hours
-- Contact (phone, booking URL, website)
-- Highlights and parking notes
+- **Basic Info**: Name (EN/AR), cover image, gallery
+- **Location**: Latitude/longitude, area
+- **Metro Info**: Station, walk time (custom enrichment)
+- **Tags**: family-friendly, outdoor, waterfront, etc. (custom enrichment)
+- **Cuisine**: Array of cuisine types
+- **Attributes**: Price level, rating, noise level
+- **Opening Hours**: Weekly schedule (optional for Google-sourced venues)
+- **Contact**: Phone, booking URL, website
+- **Highlights**: Curated descriptions and parking notes
+- **Google Integration**: googlePlaceId, dataSource, lastGoogleSync
+- **Google Data**: googlePhotos, googleSummary, googleTypes
+- **Restaurant Attributes**: outdoorSeating, goodForGroups, goodForChildren, liveMusic, reservable
+- **Service Options**: dineIn, takeout, delivery
+- **Menu Offerings**: servesBreakfast, servesBrunch, servesLunch, servesDinner, servesVegetarianFood
+- **Vector Search**: embedding (1536 dimensions), embeddingModel, lastEmbedded
 
 ### User Preferences
 - User ID
@@ -566,6 +605,13 @@ where2/
 - Message history (role, content, timestamp)
 - Current filters from AI parsing
 - Last message timestamp
+
+### Place Feedback (NEW)
+- Place ID
+- User ID
+- Feedback type: incorrect_tags, wrong_info, venue_closed, missing_data, other
+- Description and status
+- Admin review workflow
 
 ## 🎨 Key Features Implementation
 
@@ -594,6 +640,7 @@ Scores venues based on:
 - Weather context (outdoor preference in pleasant months)
 - Metro proximity
 - User's learned preferences
+- Semantic similarity (in hybrid mode): 60% semantic, 25% distance, 15% rating
 
 ### Preference Learning
 When memory is enabled:
@@ -711,11 +758,17 @@ This will give you a production Convex URL. Update your Vercel environment varia
 
 ## 🛣️ Roadmap (Post-MVP)
 
-### Immediate Enhancements
-- Integrate semantic/vector search into main search flow
-- Generate embeddings for all venues
+### Completed Enhancements ✅
+- ~~Integrate semantic/vector search into main search flow~~ → `hybridSearch.ts`
+- ~~Generate embeddings for all venues~~ → `embeddings.ts` with batch support
+- ~~Implement query caching for common searches~~ → `searchCache.ts` + action-cache
+- ~~Google Places API integration~~ → Full Enterprise + Atmosphere tier support
+- ~~AI-assisted venue enrichment~~ → `enrichment.ts`
+
+### Remaining Enhancements
 - Add rate limiting per user (50 queries/hour)
-- Implement query caching for common searches
+- Build admin enrichment interface (`app/admin/enrich/page.tsx`)
+- Add Google attribution to UI
 
 ### Future Features (from Scope Document)
 - **Social Media Integration** (Phase 2-3)
@@ -740,13 +793,24 @@ The app uses:
   - Average cost per query: ~$0.001-0.003
 
 - **GPT-4o-mini**: $0.15/M input tokens, $0.60/M output tokens
-  - Used for: Chat responses, conversational generation
+  - Used for: Chat responses, venue enrichment suggestions
   - Average cost per message: ~$0.0001-0.0003
+
+- **text-embedding-3-small**: $0.02/M tokens
+  - Used for: Query embeddings (cached 24h), venue embeddings
+  - Average cost per query: ~$0.00001 (with caching, near-zero after initial)
+  - Venue embedding generation: ~$0.001 per venue (one-time)
 
 **Budget-friendly alternatives** (can be configured in `convex/ai.ts`):
 - **Llama 3.1 70B**: $0.35/M tokens (both ways) - Good for chat
 - **Mistral 7B**: $0.06/M tokens - Very economical
 - **Gemini Flash 2.0**: Free tier available
+
+### Google Places API Pricing
+- **Nearby Search**: ~$32/1K requests
+- **Place Details (Enterprise)**: ~$32/1K requests
+- **Place Photos**: ~$7/1K requests
+- See [Google Places Integration](#-google-places-api-integration) for detailed cost projections
 
 ### Rate Limiting Recommendations
 For production:
