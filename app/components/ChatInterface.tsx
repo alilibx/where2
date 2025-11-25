@@ -323,16 +323,6 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
           Enter to send · Shift+Enter for new line
         </p>
       </div>
-
-      <style jsx>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
-      `}</style>
     </div>
   );
 }

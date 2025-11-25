@@ -150,16 +150,6 @@ export function AISearchBar({ onSearch, initialValue = "" }: AISearchBarProps) {
           {isProcessing ? <Loader2 size={18} className="animate-spin" /> : "Search"}
         </button>
       </div>
-
-      <style jsx>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
-      `}</style>
     </form>
   );
 }

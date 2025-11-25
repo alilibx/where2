@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AISearchBar } from "./components/AISearchBar";
 import { ChatInterface } from "./components/ChatInterface";
 import { FilterChips } from "./components/FilterChips";
@@ -9,18 +9,63 @@ import { MessageSquare, Search as SearchIcon, MapPin } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 
+const ROTATING_PHRASES = [
+  "Find your spot",
+  "Discover hidden gems",
+  "Your perfect cafe",
+  "Dinner with a view",
+  "Family-friendly fun",
+  "Near the Metro",
+];
+
+function useTypingAnimation(phrases: string[], typingSpeed = 80, pauseDuration = 2000) {
+  const [displayText, setDisplayText] = useState("");
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const currentPhrase = phrases[phraseIndex];
+
+    const timeout = setTimeout(
+      () => {
+        if (!isDeleting) {
+          if (displayText.length < currentPhrase.length) {
+            setDisplayText(currentPhrase.slice(0, displayText.length + 1));
+          } else {
+            setTimeout(() => setIsDeleting(true), pauseDuration);
+          }
+        } else {
+          if (displayText.length > 0) {
+            setDisplayText(displayText.slice(0, -1));
+          } else {
+            setIsDeleting(false);
+            setPhraseIndex((prev) => (prev + 1) % phrases.length);
+          }
+        }
+      },
+      isDeleting ? typingSpeed / 2 : typingSpeed
+    );
+
+    return () => clearTimeout(timeout);
+  }, [displayText, isDeleting, phraseIndex, phrases, typingSpeed, pauseDuration]);
+
+  return displayText;
+}
+
 export default function Home() {
-  const [userId] = useState(() => {
-    if (typeof window !== "undefined") {
-      let id = localStorage.getItem("where2-user-id");
-      if (!id) {
-        id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        localStorage.setItem("where2-user-id", id);
-      }
-      return id;
+  const [userId, setUserId] = useState("guest");
+  const [mounted, setMounted] = useState(false);
+
+  // Initialize userId on client only
+  useEffect(() => {
+    setMounted(true);
+    let id = localStorage.getItem("where2-user-id");
+    if (!id) {
+      id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem("where2-user-id", id);
     }
-    return "guest";
-  });
+    setUserId(id);
+  }, []);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState({
@@ -44,9 +89,11 @@ export default function Home() {
   const [locationPermissionAsked, setLocationPermissionAsked] = useState(false);
   const [mode, setMode] = useState<"search" | "chat">("search");
 
+  const typingText = useTypingAnimation(ROTATING_PHRASES);
+
   const results = useQuery(
     api.places.searchPlaces,
-    showResults
+    showResults && mounted
       ? {
           query: searchQuery,
           ...filters,
@@ -59,7 +106,7 @@ export default function Home() {
 
   // Request location on mount
   useEffect(() => {
-    if (!locationPermissionAsked && typeof window !== "undefined" && "geolocation" in navigator) {
+    if (mounted && !locationPermissionAsked && "geolocation" in navigator) {
       setLocationPermissionAsked(true);
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -71,31 +118,31 @@ export default function Home() {
         () => {}
       );
     }
-  }, [locationPermissionAsked]);
+  }, [mounted, locationPermissionAsked]);
 
-  const handleSearch = (query: string, aiFilters?: any, intent?: string) => {
+  const handleSearch = useCallback((query: string, aiFilters?: any, intent?: string) => {
     setSearchQuery(intent || query);
 
     if (aiFilters) {
-      setFilters({
-        category: aiFilters.category ?? filters.category,
-        tags: aiFilters.tags ?? filters.tags,
-        priceLevel: aiFilters.priceLevel ?? filters.priceLevel,
-        area: aiFilters.area ?? filters.area,
-        nearMetro: aiFilters.nearMetro ?? filters.nearMetro,
-        minRating: aiFilters.minRating ?? filters.minRating,
-        cuisine: aiFilters.cuisine ?? filters.cuisine,
-        noise: aiFilters.noise ?? filters.noise,
-        openNow: aiFilters.openNow ?? filters.openNow,
-      });
+      setFilters((prev) => ({
+        category: aiFilters.category ?? prev.category,
+        tags: aiFilters.tags ?? prev.tags,
+        priceLevel: aiFilters.priceLevel ?? prev.priceLevel,
+        area: aiFilters.area ?? prev.area,
+        nearMetro: aiFilters.nearMetro ?? prev.nearMetro,
+        minRating: aiFilters.minRating ?? prev.minRating,
+        cuisine: aiFilters.cuisine ?? prev.cuisine,
+        noise: aiFilters.noise ?? prev.noise,
+        openNow: aiFilters.openNow ?? prev.openNow,
+      }));
     }
 
     setShowResults(true);
-  };
+  }, []);
 
-  const handleFilterChange = (newFilters: typeof filters) => {
+  const handleFilterChange = useCallback((newFilters: typeof filters) => {
     setFilters(newFilters);
-  };
+  }, []);
 
   const quickFilters = [
     { label: "Open Now", filters: { openNow: true } },
@@ -214,9 +261,21 @@ export default function Home() {
                   fontWeight: 700,
                   marginBottom: 8,
                   letterSpacing: "-0.02em",
+                  minHeight: 40,
                 }}
               >
-                Find your spot
+                {typingText}
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 2,
+                    height: 32,
+                    background: "var(--accent)",
+                    marginLeft: 2,
+                    verticalAlign: "middle",
+                    animation: "blink 1s step-end infinite",
+                  }}
+                />
               </h1>
               <p style={{ color: "var(--text-secondary)", fontSize: 16 }}>
                 Discover the best places in Dubai
@@ -312,6 +371,7 @@ export default function Home() {
           </div>
         )}
       </div>
+
     </main>
   );
 }
