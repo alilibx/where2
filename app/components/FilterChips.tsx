@@ -3,14 +3,14 @@
 import { X } from "lucide-react";
 
 interface Filters {
-  category?: string;
+  category: string | undefined;
   tags: string[];
-  priceLevel?: string;
-  area?: string;
-  nearMetro?: boolean;
-  minRating?: number;
+  priceLevel: string | undefined;
+  area: string | undefined;
+  nearMetro: boolean | undefined;
+  minRating: number | undefined;
   cuisine: string[];
-  noise?: string;
+  noise: string | undefined;
   openNow: boolean;
 }
 
@@ -20,16 +20,9 @@ interface FilterChipsProps {
 }
 
 export function FilterChips({ filters, onFilterChange }: FilterChipsProps) {
-  const availableTags = [
-    "family-friendly",
-    "kid-friendly",
-    "outdoor",
-    "indoor",
-    "waterfront",
-  ];
-
-  const availablePriceLevels = ["Low", "Mid", "High", "Lux"];
-  const availableNoise = ["Quiet", "Moderate", "Lively"];
+  const tagOptions = ["family-friendly", "outdoor", "indoor", "waterfront", "quiet"];
+  const priceOptions = ["Low", "Mid", "High", "Lux"];
+  const vibeOptions = ["Quiet", "Moderate", "Lively"];
 
   const toggleTag = (tag: string) => {
     const newTags = filters.tags.includes(tag)
@@ -38,10 +31,17 @@ export function FilterChips({ filters, onFilterChange }: FilterChipsProps) {
     onFilterChange({ ...filters, tags: newTags });
   };
 
-  const togglePriceLevel = (level: string) => {
+  const togglePrice = (level: string) => {
     onFilterChange({
       ...filters,
       priceLevel: filters.priceLevel === level ? undefined : level,
+    });
+  };
+
+  const toggleVibe = (vibe: string) => {
+    onFilterChange({
+      ...filters,
+      noise: filters.noise === vibe ? undefined : vibe,
     });
   };
 
@@ -59,14 +59,7 @@ export function FilterChips({ filters, onFilterChange }: FilterChipsProps) {
     });
   };
 
-  const toggleNoise = (noise: string) => {
-    onFilterChange({
-      ...filters,
-      noise: filters.noise === noise ? undefined : noise,
-    });
-  };
-
-  const clearAllFilters = () => {
+  const clearAll = () => {
     onFilterChange({
       category: undefined,
       tags: [],
@@ -80,7 +73,7 @@ export function FilterChips({ filters, onFilterChange }: FilterChipsProps) {
     });
   };
 
-  const hasActiveFilters =
+  const hasActive =
     filters.tags.length > 0 ||
     filters.priceLevel ||
     filters.nearMetro ||
@@ -88,92 +81,107 @@ export function FilterChips({ filters, onFilterChange }: FilterChipsProps) {
     filters.noise;
 
   return (
-    <div style={{ marginBottom: "24px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
-        <span style={{ color: "white", fontWeight: "600" }}>Filters:</span>
-        {hasActiveFilters && (
-          <button
-            onClick={clearAllFilters}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              color: "white",
-              fontSize: "14px",
-              textDecoration: "underline",
-            }}
-          >
-            <X size={16} />
-            Clear all
-          </button>
-        )}
-      </div>
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
-        {/* Tags */}
-        {availableTags.map((tag) => (
-          <button
-            key={tag}
-            onClick={() => toggleTag(tag)}
-            className={`chip ${filters.tags.includes(tag) ? "active" : ""}`}
-            style={{ background: filters.tags.includes(tag) ? "#667eea" : "white" }}
-          >
-            {tag.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}
-          </button>
-        ))}
+    <div style={{ marginBottom: 24 }}>
+      {/* Main Row */}
+      <div
+        className="hide-scrollbar"
+        style={{
+          display: "flex",
+          gap: 8,
+          overflowX: "auto",
+          paddingBottom: 8,
+        }}
+      >
+        {/* Open Now */}
+        <button
+          onClick={toggleOpenNow}
+          className={`chip ${filters.openNow ? "active" : ""}`}
+        >
+          Open Now
+        </button>
 
         {/* Near Metro */}
         <button
           onClick={toggleNearMetro}
           className={`chip ${filters.nearMetro ? "active" : ""}`}
-          style={{ background: filters.nearMetro ? "#667eea" : "white" }}
         >
           Near Metro
         </button>
 
-        {/* Open Now */}
+        {/* Tags */}
+        {tagOptions.map((tag) => (
+          <button
+            key={tag}
+            onClick={() => toggleTag(tag)}
+            className={`chip ${filters.tags.includes(tag) ? "active" : ""}`}
+          >
+            {tag.replace("-", " ")}
+          </button>
+        ))}
+      </div>
+
+      {/* Second Row - Price & Vibe */}
+      <div
+        className="hide-scrollbar"
+        style={{
+          display: "flex",
+          gap: 8,
+          marginTop: 8,
+          overflowX: "auto",
+          alignItems: "center",
+        }}
+      >
+        <span style={{ color: "var(--text-secondary)", fontSize: 13, flexShrink: 0 }}>Price:</span>
+        {priceOptions.map((price) => (
+          <button
+            key={price}
+            onClick={() => togglePrice(price)}
+            className={`chip ${filters.priceLevel === price ? "active" : ""}`}
+          >
+            {price}
+          </button>
+        ))}
+
+        <span
+          style={{
+            width: 1,
+            height: 20,
+            background: "var(--border-light)",
+            margin: "0 8px",
+            flexShrink: 0,
+          }}
+        />
+
+        <span style={{ color: "var(--text-secondary)", fontSize: 13, flexShrink: 0 }}>Vibe:</span>
+        {vibeOptions.map((vibe) => (
+          <button
+            key={vibe}
+            onClick={() => toggleVibe(vibe)}
+            className={`chip ${filters.noise === vibe ? "active" : ""}`}
+          >
+            {vibe}
+          </button>
+        ))}
+      </div>
+
+      {/* Clear All */}
+      {hasActive && (
         <button
-          onClick={toggleOpenNow}
-          className={`chip ${filters.openNow ? "active" : ""}`}
-          style={{ background: filters.openNow ? "#667eea" : "white" }}
+          onClick={clearAll}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            marginTop: 12,
+            color: "var(--text-secondary)",
+            fontSize: 13,
+            fontWeight: 500,
+          }}
         >
-          Open Now
+          <X size={14} />
+          Clear filters
         </button>
-      </div>
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
-        {/* Price Levels */}
-        <span style={{ color: "white", fontSize: "14px", alignSelf: "center", marginRight: "8px" }}>
-          Price:
-        </span>
-        {availablePriceLevels.map((level) => (
-          <button
-            key={level}
-            onClick={() => togglePriceLevel(level)}
-            className={`chip ${filters.priceLevel === level ? "active" : ""}`}
-            style={{ background: filters.priceLevel === level ? "#667eea" : "white" }}
-          >
-            {level}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-        {/* Noise Levels */}
-        <span style={{ color: "white", fontSize: "14px", alignSelf: "center", marginRight: "8px" }}>
-          Vibe:
-        </span>
-        {availableNoise.map((noise) => (
-          <button
-            key={noise}
-            onClick={() => toggleNoise(noise)}
-            className={`chip ${filters.noise === noise ? "active" : ""}`}
-            style={{ background: filters.noise === noise ? "#667eea" : "white" }}
-          >
-            {noise}
-          </button>
-        ))}
-      </div>
+      )}
     </div>
   );
 }

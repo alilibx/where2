@@ -1,6 +1,6 @@
 "use client";
 
-import { Star, MapPin, Phone, ExternalLink, Share2, Navigation } from "lucide-react";
+import { Star, MapPin, Phone, Navigation, ArrowUpRight } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
@@ -12,7 +12,7 @@ interface Place {
   rating: number;
   priceLevel: string;
   distance: number;
-  isOpen: boolean | null; // null when opening hours not available (fetch live from Google)
+  isOpen: boolean | null;
   reasons: string;
   area: string;
   cuisine: string[];
@@ -22,6 +22,7 @@ interface Place {
   longitude: number;
   metroStation?: string;
   metroWalkTime?: number;
+  googlePhotos?: string[];
 }
 
 interface PlaceCardProps {
@@ -36,15 +37,12 @@ export function PlaceCard({ place, userId, searchQuery, filters, isBestMatch }: 
   const recordSelection = useMutation(api.preferences.recordPlaceSelection);
 
   const handleCardClick = () => {
-    // Record the selection for preference learning
     recordSelection({
       userId,
       placeId: place._id,
       query: searchQuery,
       filters,
     });
-
-    // Navigate to details page
     window.location.href = `/place/${place._id}`;
   };
 
@@ -69,202 +67,153 @@ export function PlaceCard({ place, userId, searchQuery, filters, isBestMatch }: 
     }
   };
 
-  const handleBook = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (place.bookingUrl) {
-      window.open(place.bookingUrl, "_blank");
-    }
-  };
-
-  const handleShare = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const shareData = {
-      title: place.name,
-      text: `Check out ${place.name} in ${place.area} - ${place.reasons}`,
-      url: window.location.origin + `/place/${place._id}`,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        console.log("Share cancelled");
-      }
-    } else {
-      // Fallback: copy to clipboard
-      navigator.clipboard.writeText(`${shareData.title}\n${shareData.text}\n${shareData.url}`);
-      alert("Link copied to clipboard!");
-    }
-  };
-
-  const getPriceLevelSymbols = (level: string) => {
-    const map: { [key: string]: string } = {
-      Low: "$",
-      Mid: "$$",
-      High: "$$$",
-      Lux: "$$$$",
-    };
+  const getPriceSymbol = (level: string) => {
+    const map: Record<string, string> = { Low: "$", Mid: "$$", High: "$$$", Lux: "$$$$" };
     return map[level] || level;
   };
 
+  // Use Google photos if available, fall back to coverImage
+  const imageUrl = place.googlePhotos?.[0] || place.coverImage;
+
   return (
-    <div
-      className="card"
+    <article
       onClick={handleCardClick}
+      className="card card-hover"
       style={{
         cursor: "pointer",
-        border: isBestMatch ? "3px solid #FFD700" : "none",
+        padding: 0,
+        overflow: "hidden",
         position: "relative",
       }}
     >
-      {/* Cover Image */}
+      {/* Best Match Badge */}
+      {isBestMatch && (
+        <div
+          style={{
+            position: "absolute",
+            top: 12,
+            left: 12,
+            zIndex: 10,
+            background: "var(--accent)",
+            color: "white",
+            padding: "4px 10px",
+            borderRadius: "var(--radius-full)",
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: "0.02em",
+          }}
+        >
+          Best Match
+        </div>
+      )}
+
+      {/* Image */}
       <div
         style={{
           width: "100%",
-          height: "200px",
-          borderRadius: "8px",
-          background: `linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.4)), url(${place.coverImage})`,
+          height: 180,
+          background: imageUrl
+            ? `url(${imageUrl})`
+            : "linear-gradient(135deg, var(--bg-tertiary) 0%, var(--border-light) 100%)",
           backgroundSize: "cover",
           backgroundPosition: "center",
-          marginBottom: "16px",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
-          padding: "16px",
+          position: "relative",
         }}
       >
-        {/* Status badge */}
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <span
-            style={{
-              background: place.isOpen ? "#10b981" : "#ef4444",
-              color: "white",
-              padding: "4px 12px",
-              borderRadius: "12px",
-              fontSize: "12px",
-              fontWeight: "600",
-            }}
-          >
-            {place.isOpen ? "Open Now" : "Closed"}
-          </span>
-        </div>
-
-        {/* Name */}
-        <h3 style={{ color: "white", fontSize: "24px", fontWeight: "700" }}>
-          {place.name}
-        </h3>
-      </div>
-
-      {/* Info */}
-      <div style={{ marginBottom: "12px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "8px" }}>
-          {/* Rating */}
-          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-            <Star size={16} fill="#FFD700" color="#FFD700" />
-            <span style={{ fontWeight: "600" }}>{place.rating.toFixed(1)}</span>
-          </div>
-
-          {/* Price */}
-          <span style={{ color: "#666", fontWeight: "600" }}>
-            {getPriceLevelSymbols(place.priceLevel)}
-          </span>
-
-          {/* Cuisine */}
-          <span style={{ color: "#666" }}>{place.cuisine.join(", ")}</span>
-        </div>
-
-        {/* Area and Distance */}
-        <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "#666", marginBottom: "8px" }}>
-          <MapPin size={14} />
-          <span style={{ fontSize: "14px" }}>
-            {place.area}
-            {place.distance > 0 && ` • ${place.distance.toFixed(1)} km away`}
-          </span>
-        </div>
-
-        {/* Metro info */}
-        {place.metroStation && (
-          <div style={{ fontSize: "14px", color: "#667eea", marginBottom: "8px" }}>
-            🚇 {place.metroStation} Metro ({place.metroWalkTime} min walk)
-          </div>
-        )}
-
-        {/* Reasons */}
+        {/* Open Status */}
         <div
           style={{
-            background: "#f3f4f6",
-            padding: "8px 12px",
-            borderRadius: "8px",
-            fontSize: "14px",
-            color: "#333",
-            marginBottom: "12px",
+            position: "absolute",
+            top: 12,
+            right: 12,
           }}
         >
-          {place.reasons}
+          <span
+            className={`badge ${place.isOpen ? "badge-success" : "badge-error"}`}
+            style={{ fontSize: 11 }}
+          >
+            {place.isOpen ? "Open" : "Closed"}
+          </span>
         </div>
       </div>
 
-      {/* Tags */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "16px" }}>
-        {place.tags.map((tag) => (
-          <span
-            key={tag}
-            style={{
-              background: "#e0e7ff",
-              color: "#667eea",
-              padding: "4px 10px",
-              borderRadius: "12px",
-              fontSize: "12px",
-              fontWeight: "500",
-            }}
-          >
-            {tag}
+      {/* Content */}
+      <div style={{ padding: 16 }}>
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 8 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.3 }}>{place.name}</h3>
+          <ArrowUpRight size={16} color="var(--text-tertiary)" style={{ flexShrink: 0, marginLeft: 8 }} />
+        </div>
+
+        {/* Meta */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <Star size={14} fill="#facc15" color="#facc15" />
+            <span style={{ fontSize: 13, fontWeight: 500 }}>{place.rating.toFixed(1)}</span>
+          </div>
+          <span style={{ color: "var(--text-secondary)", fontSize: 13 }}>{getPriceSymbol(place.priceLevel)}</span>
+          {place.cuisine.length > 0 && (
+            <span style={{ color: "var(--text-secondary)", fontSize: 13 }}>{place.cuisine[0]}</span>
+          )}
+        </div>
+
+        {/* Location */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text-secondary)", marginBottom: 8 }}>
+          <MapPin size={13} />
+          <span style={{ fontSize: 13 }}>
+            {place.area}
+            {place.distance > 0 && ` · ${place.distance.toFixed(1)} km`}
           </span>
-        ))}
-      </div>
+        </div>
 
-      {/* Action Buttons */}
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-        <button
-          onClick={handleNavigate}
-          className="btn btn-primary"
-          style={{ flex: 1, minWidth: "120px", fontSize: "14px", padding: "10px 16px" }}
-        >
-          <Navigation size={16} />
-          Navigate
-        </button>
-
-        {place.phone && (
-          <button
-            onClick={handleCall}
-            className="btn btn-secondary"
-            style={{ fontSize: "14px", padding: "10px 16px" }}
-          >
-            <Phone size={16} />
-            Call
-          </button>
+        {/* Metro */}
+        {place.metroStation && (
+          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10 }}>
+            🚇 {place.metroStation} · {place.metroWalkTime} min walk
+          </div>
         )}
 
-        {place.bookingUrl && (
-          <button
-            onClick={handleBook}
-            className="btn btn-secondary"
-            style={{ fontSize: "14px", padding: "10px 16px" }}
-          >
-            <ExternalLink size={16} />
-            Book
-          </button>
-        )}
+        {/* Tags */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+          {place.tags.slice(0, 3).map((tag) => (
+            <span
+              key={tag}
+              style={{
+                background: "var(--bg-tertiary)",
+                color: "var(--text-secondary)",
+                padding: "3px 8px",
+                borderRadius: "var(--radius-full)",
+                fontSize: 11,
+                fontWeight: 500,
+              }}
+            >
+              {tag.replace("-", " ")}
+            </span>
+          ))}
+        </div>
 
-        <button
-          onClick={handleShare}
-          className="btn btn-secondary"
-          style={{ fontSize: "14px", padding: "10px 16px" }}
-        >
-          <Share2 size={16} />
-          Share
-        </button>
+        {/* Actions */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={handleNavigate}
+            className="btn btn-primary"
+            style={{ flex: 1, padding: "10px 14px", fontSize: 13 }}
+          >
+            <Navigation size={14} />
+            Directions
+          </button>
+          {place.phone && (
+            <button
+              onClick={handleCall}
+              className="btn btn-secondary"
+              style={{ padding: "10px 14px", fontSize: 13 }}
+            >
+              <Phone size={14} />
+              Call
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+    </article>
   );
 }

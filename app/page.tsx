@@ -1,13 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { SearchBar } from "./components/SearchBar";
+import { useState, useEffect } from "react";
 import { AISearchBar } from "./components/AISearchBar";
 import { ChatInterface } from "./components/ChatInterface";
 import { FilterChips } from "./components/FilterChips";
 import { ResultsList } from "./components/ResultsList";
-import { PreferenceToggle } from "./components/PreferenceToggle";
-import { MessageSquare, Search as SearchIcon, Sparkles } from "lucide-react";
+import { MessageSquare, Search as SearchIcon, MapPin } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 
@@ -44,10 +42,7 @@ export default function Home() {
 
   const [showResults, setShowResults] = useState(false);
   const [locationPermissionAsked, setLocationPermissionAsked] = useState(false);
-  const [mode, setMode] = useState<"search" | "chat">("search"); // search or chat mode
-  const [useAI, setUseAI] = useState(true); // Toggle AI parsing in search mode
-
-  const userPrefs = useQuery(api.preferences.getUserPreferences, { userId });
+  const [mode, setMode] = useState<"search" | "chat">("search");
 
   const results = useQuery(
     api.places.searchPlaces,
@@ -62,11 +57,25 @@ export default function Home() {
       : "skip"
   );
 
+  // Request location on mount
+  useEffect(() => {
+    if (!locationPermissionAsked && typeof window !== "undefined" && "geolocation" in navigator) {
+      setLocationPermissionAsked(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lon: position.coords.longitude,
+          });
+        },
+        () => {}
+      );
+    }
+  }, [locationPermissionAsked]);
+
   const handleSearch = (query: string, aiFilters?: any, intent?: string) => {
     setSearchQuery(intent || query);
 
-    // If AI provided filters, merge them with existing filters
-    // Note: AI returns null for unspecified fields, treat null same as undefined
     if (aiFilters) {
       setFilters({
         category: aiFilters.category ?? filters.category,
@@ -82,156 +91,107 @@ export default function Home() {
     }
 
     setShowResults(true);
-
-    // Request location permission on first search if not asked
-    if (!locationPermissionAsked && typeof window !== "undefined" && "geolocation" in navigator) {
-      setLocationPermissionAsked(true);
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lon: position.coords.longitude,
-          });
-        },
-        (error) => {
-          console.log("Location permission denied or error:", error);
-        }
-      );
-    }
   };
 
-  const handleFilterChange = (newFilters: {
-    category?: string;
-    tags: string[];
-    priceLevel?: string;
-    area?: string;
-    nearMetro?: boolean;
-    minRating?: number;
-    cuisine: string[];
-    noise?: string;
-    openNow: boolean;
-  }) => {
-    setFilters({
-      category: newFilters.category,
-      tags: newFilters.tags,
-      priceLevel: newFilters.priceLevel,
-      area: newFilters.area,
-      nearMetro: newFilters.nearMetro,
-      minRating: newFilters.minRating,
-      cuisine: newFilters.cuisine,
-      noise: newFilters.noise,
-      openNow: newFilters.openNow,
-    });
-    if (showResults) {
-      // Trigger re-search with new filters
-      setShowResults(true);
-    }
+  const handleFilterChange = (newFilters: typeof filters) => {
+    setFilters(newFilters);
   };
+
+  const quickFilters = [
+    { label: "Open Now", filters: { openNow: true } },
+    { label: "Near Metro", filters: { nearMetro: true } },
+    { label: "Family", filters: { tags: ["family-friendly"] } },
+    { label: "Outdoor", filters: { tags: ["outdoor"] } },
+    { label: "Waterfront", filters: { tags: ["waterfront"] } },
+  ];
 
   return (
-    <main style={{ minHeight: "100vh", paddingBottom: "40px" }}>
+    <main style={{ minHeight: "100vh", paddingBottom: 48 }}>
       {/* Header */}
-      <div style={{ background: "rgba(255,255,255,0.1)", backdropFilter: "blur(10px)" }}>
-        <div className="container" style={{ padding: "20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
-            <h1 style={{ color: "white", fontSize: "28px", fontWeight: "700" }}>
-              Where2 Dubai
-            </h1>
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 100,
+          background: "var(--bg-secondary)",
+          borderBottom: "1px solid var(--border-light)",
+        }}
+      >
+        <div className="container" style={{ padding: "12px 16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            {/* Logo */}
+            <div
+              style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+              onClick={() => {
+                setShowResults(false);
+                setSearchQuery("");
+              }}
+            >
+              <MapPin size={20} strokeWidth={2.5} />
+              <span style={{ fontSize: 17, fontWeight: 600 }}>Where2</span>
+            </div>
 
-            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-              {/* Mode Toggle */}
-              <div
+            {/* Mode Toggle */}
+            <div
+              style={{
+                display: "flex",
+                background: "var(--bg-tertiary)",
+                borderRadius: "var(--radius-full)",
+                padding: 3,
+              }}
+            >
+              <button
+                onClick={() => setMode("search")}
                 style={{
+                  padding: "6px 14px",
+                  borderRadius: "var(--radius-full)",
+                  background: mode === "search" ? "var(--bg-secondary)" : "transparent",
+                  color: mode === "search" ? "var(--text-primary)" : "var(--text-secondary)",
+                  fontWeight: 500,
+                  fontSize: 13,
                   display: "flex",
-                  background: "rgba(255,255,255,0.2)",
-                  borderRadius: "12px",
-                  padding: "4px",
+                  alignItems: "center",
+                  gap: 6,
+                  boxShadow: mode === "search" ? "var(--shadow-sm)" : "none",
                 }}
               >
-                <button
-                  onClick={() => setMode("search")}
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: "8px",
-                    background: mode === "search" ? "white" : "transparent",
-                    color: mode === "search" ? "#667eea" : "white",
-                    fontWeight: "600",
-                    fontSize: "14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    transition: "all 0.2s",
-                  }}
-                >
-                  <SearchIcon size={16} />
-                  Search
-                </button>
-                <button
-                  onClick={() => {
-                    setMode("chat");
-                    setShowResults(false);
-                  }}
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: "8px",
-                    background: mode === "chat" ? "white" : "transparent",
-                    color: mode === "chat" ? "#667eea" : "white",
-                    fontWeight: "600",
-                    fontSize: "14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    transition: "all 0.2s",
-                  }}
-                >
-                  <MessageSquare size={16} />
-                  Chat
-                </button>
-              </div>
-
-              {/* AI Toggle for Search Mode */}
-              {mode === "search" && (
-                <button
-                  onClick={() => setUseAI(!useAI)}
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: "8px",
-                    background: useAI ? "rgba(102, 126, 234, 0.3)" : "rgba(255,255,255,0.2)",
-                    color: "white",
-                    fontWeight: "600",
-                    fontSize: "14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    border: useAI ? "2px solid rgba(102, 126, 234, 0.5)" : "2px solid transparent",
-                    transition: "all 0.2s",
-                  }}
-                  title={useAI ? "AI parsing enabled" : "AI parsing disabled"}
-                >
-                  <Sparkles size={16} />
-                  AI {useAI ? "ON" : "OFF"}
-                </button>
-              )}
-
-              <PreferenceToggle userId={userId} currentPrefs={userPrefs || undefined} />
+                <SearchIcon size={14} />
+                Search
+              </button>
+              <button
+                onClick={() => {
+                  setMode("chat");
+                  setShowResults(false);
+                }}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: "var(--radius-full)",
+                  background: mode === "chat" ? "var(--bg-secondary)" : "transparent",
+                  color: mode === "chat" ? "var(--text-primary)" : "var(--text-secondary)",
+                  fontWeight: 500,
+                  fontSize: 13,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  boxShadow: mode === "chat" ? "var(--shadow-sm)" : "none",
+                }}
+              >
+                <MessageSquare size={14} />
+                Chat
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Main Content */}
-      <div className="container" style={{ marginTop: "40px" }}>
+      <div className="container" style={{ paddingTop: 24 }}>
         {mode === "chat" ? (
-          // Chat Mode
-          <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+          <div style={{ maxWidth: 720, margin: "0 auto" }}>
             <ChatInterface userId={userId} onSearchTriggered={handleSearch} />
 
-            {/* Show results below chat if any */}
             {showResults && results && (
-              <div style={{ marginTop: "32px" }}>
-                <h3 style={{ color: "white", fontSize: "24px", fontWeight: "600", marginBottom: "16px" }}>
-                  Results
-                </h3>
+              <div style={{ marginTop: 32 }}>
                 <FilterChips filters={filters} onFilterChange={handleFilterChange} />
                 <ResultsList
                   results={results.places}
@@ -245,113 +205,91 @@ export default function Home() {
             )}
           </div>
         ) : !showResults ? (
-          // Home/Onboarding View (Search Mode)
-          <div style={{ textAlign: "center", maxWidth: "600px", margin: "0 auto" }}>
-            <h2
-              style={{
-                color: "white",
-                fontSize: "32px",
-                fontWeight: "700",
-                marginBottom: "16px",
-              }}
-            >
-              What are you in the mood for?
-            </h2>
-            <p style={{ color: "rgba(255,255,255,0.9)", fontSize: "18px", marginBottom: "32px" }}>
-              Discover the perfect place in Dubai, right now.
-            </p>
-
-            {useAI ? (
-              <AISearchBar onSearch={handleSearch} useAI={true} />
-            ) : (
-              <SearchBar onSearch={handleSearch} />
-            )}
-
-            {/* Quick chips */}
-            <div style={{ marginTop: "32px" }}>
-              <p style={{ color: "white", marginBottom: "16px", fontSize: "14px" }}>
-                Quick suggestions:
+          /* Home View */
+          <div style={{ maxWidth: 560, margin: "0 auto", paddingTop: 48 }}>
+            <div style={{ textAlign: "center", marginBottom: 32 }}>
+              <h1
+                style={{
+                  fontSize: 32,
+                  fontWeight: 700,
+                  marginBottom: 8,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                Find your spot
+              </h1>
+              <p style={{ color: "var(--text-secondary)", fontSize: 16 }}>
+                Discover the best places in Dubai
               </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "center" }}>
-                {[
-                  { label: "Outdoor now", filters: { tags: ["outdoor"] } },
-                  { label: "Near Metro", filters: { nearMetro: true } },
-                  { label: "Family-friendly", filters: { tags: ["family-friendly"] } },
-                  { label: "Waterfront", filters: { tags: ["waterfront"] } },
-                  { label: "Open late", filters: { openNow: true } },
-                ].map((suggestion) => (
-                  <button
-                    key={suggestion.label}
-                    className="chip"
-                    style={{ background: "rgba(255,255,255,0.9)" }}
-                    onClick={() => {
-                      handleFilterChange({
-                        ...filters,
-                        ...suggestion.filters,
-                        tags: suggestion.filters.tags
-                          ? [...filters.tags, ...suggestion.filters.tags]
-                          : filters.tags,
-                      });
-                      setSearchQuery(suggestion.label);
-                      setShowResults(true);
-                    }}
-                  >
-                    {suggestion.label}
-                  </button>
-                ))}
-              </div>
             </div>
 
-            {/* Info section */}
+            <AISearchBar onSearch={handleSearch} />
+
+            {/* Quick Filters */}
             <div
               style={{
-                marginTop: "48px",
-                background: "rgba(255,255,255,0.95)",
-                borderRadius: "12px",
-                padding: "24px",
-                textAlign: "left",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 8,
+                justifyContent: "center",
+                marginTop: 20,
               }}
             >
-              <h3 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "12px" }}>
-                How it works
-              </h3>
-              <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "12px" }}>
-                <li style={{ display: "flex", gap: "12px" }}>
-                  <span style={{ fontSize: "24px" }}>🎤</span>
+              {quickFilters.map((item) => (
+                <button
+                  key={item.label}
+                  className="chip"
+                  onClick={() => {
+                    const newTags = item.filters.tags
+                      ? Array.from(new Set([...filters.tags, ...item.filters.tags]))
+                      : filters.tags;
+                    handleFilterChange({
+                      ...filters,
+                      ...item.filters,
+                      tags: newTags,
+                    });
+                    setSearchQuery(item.label);
+                    setShowResults(true);
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Info Cards */}
+            <div style={{ marginTop: 48, display: "grid", gap: 12 }}>
+              {[
+                { icon: "🎯", title: "AI-Powered", desc: "Natural language search" },
+                { icon: "🗺️", title: "150+ Venues", desc: "Curated Dubai spots" },
+                { icon: "⚡", title: "Real-time", desc: "Open now & directions" },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: "14px 16px",
+                    background: "var(--bg-secondary)",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--border-light)",
+                  }}
+                >
+                  <span style={{ fontSize: 22 }}>{item.icon}</span>
                   <div>
-                    <strong>Speak or type</strong> what you're looking for
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{item.title}</div>
+                    <div style={{ color: "var(--text-secondary)", fontSize: 13 }}>{item.desc}</div>
                   </div>
-                </li>
-                <li style={{ display: "flex", gap: "12px" }}>
-                  <span style={{ fontSize: "24px" }}>🎯</span>
-                  <div>
-                    <strong>AI-powered matching</strong> understands your intent
-                  </div>
-                </li>
-                <li style={{ display: "flex", gap: "12px" }}>
-                  <span style={{ fontSize: "24px" }}>💬</span>
-                  <div>
-                    <strong>Chat mode available</strong> for conversational search
-                  </div>
-                </li>
-                <li style={{ display: "flex", gap: "12px" }}>
-                  <span style={{ fontSize: "24px" }}>🗺️</span>
-                  <div>
-                    <strong>Navigate, call, or book</strong> in one tap
-                  </div>
-                </li>
-              </ul>
+                </div>
+              ))}
             </div>
           </div>
         ) : (
-          // Results View (Search Mode)
-          <div>
-            <div style={{ marginBottom: "24px" }}>
-              {useAI ? (
-                <AISearchBar onSearch={handleSearch} initialValue={searchQuery} useAI={true} />
-              ) : (
-                <SearchBar onSearch={handleSearch} initialValue={searchQuery} />
-              )}
+          /* Results View */
+          <div style={{ maxWidth: 960, margin: "0 auto" }}>
+            <div style={{ marginBottom: 24 }}>
+              <AISearchBar onSearch={handleSearch} initialValue={searchQuery} />
             </div>
 
             <FilterChips filters={filters} onFilterChange={handleFilterChange} />
@@ -366,8 +304,9 @@ export default function Home() {
                 filters={filters}
               />
             ) : (
-              <div style={{ textAlign: "center", color: "white", padding: "40px" }}>
-                <p>Searching...</p>
+              <div style={{ textAlign: "center", padding: 48, color: "var(--text-secondary)" }}>
+                <div className="skeleton" style={{ width: 200, height: 20, margin: "0 auto 12px" }} />
+                <div className="skeleton" style={{ width: 140, height: 16, margin: "0 auto" }} />
               </div>
             )}
           </div>

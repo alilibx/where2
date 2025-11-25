@@ -1,30 +1,25 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Mic, Search, Sparkles, Loader2 } from "lucide-react";
+import { Mic, Search, Loader2 } from "lucide-react";
 import { useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
 interface AISearchBarProps {
   onSearch: (query: string, aiFilters?: any, intent?: string) => void;
   initialValue?: string;
-  useAI?: boolean;
 }
 
-export function AISearchBar({
-  onSearch,
-  initialValue = "",
-  useAI = true,
-}: AISearchBarProps) {
+export function AISearchBar({ onSearch, initialValue = "" }: AISearchBarProps) {
   const [query, setQuery] = useState(initialValue);
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const parseQuery = useAction(api.ai.parseSearchQuery);
 
   useEffect(() => {
-    // Initialize speech recognition
     if (typeof window !== "undefined" && "webkitSpeechRecognition" in window) {
       const SpeechRecognition = (window as any).webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
@@ -39,20 +34,15 @@ export function AISearchBar({
         handleSearch(transcript);
       };
 
-      recognitionRef.current.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
+      recognitionRef.current.onerror = () => {
         setIsListening(false);
-
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          alert("Microphone access denied. Please allow microphone access in your browser settings.");
-        }
       };
 
       recognitionRef.current.onend = () => {
         setIsListening(false);
       };
     }
-  }, [onSearch]);
+  }, []);
 
   const handleVoiceSearch = () => {
     if (recognitionRef.current) {
@@ -63,8 +53,6 @@ export function AISearchBar({
         recognitionRef.current.start();
         setIsListening(true);
       }
-    } else {
-      alert("Voice search is not supported in your browser. Please use Chrome or Safari.");
     }
   };
 
@@ -72,31 +60,19 @@ export function AISearchBar({
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) return;
 
-    if (useAI) {
-      setIsProcessing(true);
-      try {
-        const result = await parseQuery({
-          query: trimmedQuery,
-        });
+    setIsProcessing(true);
+    try {
+      const result = await parseQuery({ query: trimmedQuery });
 
-        if (result.success && result.result) {
-          onSearch(
-            trimmedQuery,
-            result.result.filters,
-            result.result.intent
-          );
-        } else {
-          // Fallback to regular search
-          onSearch(trimmedQuery);
-        }
-      } catch (error) {
-        console.error("AI parsing error:", error);
+      if (result.success && result.result) {
+        onSearch(trimmedQuery, result.result.filters, result.result.intent);
+      } else {
         onSearch(trimmedQuery);
-      } finally {
-        setIsProcessing(false);
       }
-    } else {
+    } catch (error) {
       onSearch(trimmedQuery);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -110,123 +86,78 @@ export function AISearchBar({
       <div
         style={{
           display: "flex",
-          gap: "12px",
-          background: "white",
-          borderRadius: "12px",
-          padding: "8px",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-          position: "relative",
+          alignItems: "center",
+          gap: 8,
+          background: "var(--bg-secondary)",
+          borderRadius: "var(--radius-lg)",
+          border: "1px solid var(--border-light)",
+          padding: "6px 6px 6px 16px",
+          boxShadow: "var(--shadow-sm)",
         }}
       >
-        <button
-          type="button"
-          onClick={handleVoiceSearch}
-          style={{
-            padding: "12px",
-            borderRadius: "8px",
-            background: isListening ? "#ef4444" : "#667eea",
-            color: "white",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            minWidth: "48px",
-            transition: "all 0.2s",
-          }}
-          aria-label="Voice search"
-          disabled={isProcessing}
-        >
-          <Mic size={24} style={{ animation: isListening ? "pulse 1.5s infinite" : "none" }} />
-        </button>
+        <Search size={18} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
 
         <input
+          ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={
-            useAI
-              ? "Tell me what you're looking for..."
-              : "E.g., Family-friendly cafe near Metro..."
-          }
+          placeholder="Search for cafes, restaurants, or describe what you want..."
           disabled={isProcessing}
           style={{
             flex: 1,
             border: "none",
             outline: "none",
-            fontSize: "16px",
-            padding: "12px",
+            fontSize: 15,
+            padding: "10px 0",
+            background: "transparent",
+            color: "var(--text-primary)",
+            minWidth: 0,
           }}
         />
 
-        {useAI && (
-          <div
-            style={{
-              position: "absolute",
-              right: "80px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              color: "#667eea",
-              fontSize: "12px",
-              fontWeight: "600",
-              padding: "4px 8px",
-              background: "#e0e7ff",
-              borderRadius: "8px",
-            }}
-          >
-            <Sparkles size={14} />
-            AI
-          </div>
-        )}
-
+        {/* Voice Button */}
         <button
-          type="submit"
+          type="button"
+          onClick={handleVoiceSearch}
           disabled={isProcessing}
           style={{
-            padding: "12px 24px",
-            borderRadius: "8px",
-            background: "#667eea",
-            color: "white",
+            padding: 10,
+            borderRadius: "var(--radius-md)",
+            background: isListening ? "var(--error)" : "var(--bg-tertiary)",
+            color: isListening ? "white" : "var(--text-secondary)",
             display: "flex",
             alignItems: "center",
-            gap: "8px",
-            fontWeight: "600",
-            transition: "all 0.2s",
-            opacity: isProcessing ? 0.7 : 1,
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+          aria-label="Voice search"
+        >
+          <Mic size={18} />
+        </button>
+
+        {/* Search Button */}
+        <button
+          type="submit"
+          disabled={isProcessing || !query.trim()}
+          className="btn btn-primary"
+          style={{
+            padding: "10px 16px",
+            opacity: isProcessing || !query.trim() ? 0.6 : 1,
+            flexShrink: 0,
           }}
         >
-          {isProcessing ? (
-            <>
-              <Loader2 size={20} style={{ animation: "spin 1s linear infinite" }} />
-              Processing...
-            </>
-          ) : (
-            <>
-              <Search size={20} />
-              Search
-            </>
-          )}
+          {isProcessing ? <Loader2 size={18} className="animate-spin" /> : "Search"}
         </button>
       </div>
 
       <style jsx>{`
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
-        }
         @keyframes spin {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
         }
       `}</style>
     </form>

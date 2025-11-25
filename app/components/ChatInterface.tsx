@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, Trash2, Sparkles, Mic, MicOff } from "lucide-react";
+import { Send, Loader2, Trash2, Mic, MicOff } from "lucide-react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
@@ -15,7 +15,7 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
   const [isProcessing, setIsProcessing] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
-  const isListeningRef = useRef(false); // Track listening state for closures
+  const isListeningRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const conversation = useQuery(api.conversations.getConversation, { userId });
@@ -26,21 +26,18 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
 
   const messages = conversation?.messages || [];
 
-  // Initialize Web Speech API
   useEffect(() => {
     if (typeof window !== "undefined") {
       const SpeechRecognition =
-        (window as any).SpeechRecognition ||
-        (window as any).webkitSpeechRecognition;
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
       if (SpeechRecognition) {
-        const recognitionInstance = new SpeechRecognition();
-        recognitionInstance.continuous = true; // Keep listening until manually stopped
-        recognitionInstance.interimResults = true;
-        recognitionInstance.lang = "en-US";
-        recognitionInstance.maxAlternatives = 1;
+        const rec = new SpeechRecognition();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = "en-US";
 
-        recognitionInstance.onresult = (event: any) => {
+        rec.onresult = (event: any) => {
           let transcript = "";
           for (let i = event.resultIndex; i < event.results.length; i++) {
             transcript += event.results[i][0].transcript;
@@ -48,38 +45,19 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
           setInput(transcript);
         };
 
-        recognitionInstance.onerror = (event: any) => {
-          console.error("Speech recognition error:", event.error);
-
-          // Handle specific errors
-          if (event.error === 'no-speech') {
-            // Don't stop for no-speech in continuous mode - just log it
-            console.log("No speech detected, continuing to listen...");
-            return;
-          } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        rec.onerror = (event: any) => {
+          if (event.error !== "no-speech") {
             setIsListening(false);
-            alert("Microphone access denied. Please allow microphone access in your browser settings.");
-          } else if (event.error === 'aborted') {
-            // User manually stopped, don't restart
-            setIsListening(false);
-          } else {
-            // Other errors - try to continue
-            console.log("Recognition error, attempting to continue:", event.error);
+            isListeningRef.current = false;
           }
         };
 
-        recognitionInstance.onend = () => {
-          // Auto-restart if user hasn't manually stopped
-          console.log("Recognition ended, checking if should restart...");
-
-          // Check ref instead of state to avoid closure issues
+        rec.onend = () => {
           setTimeout(() => {
             if (isListeningRef.current) {
               try {
-                console.log("Restarting recognition...");
-                recognitionInstance.start();
-              } catch (error) {
-                console.error("Failed to restart recognition:", error);
+                rec.start();
+              } catch {
                 setIsListening(false);
                 isListeningRef.current = false;
               }
@@ -87,11 +65,7 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
           }, 100);
         };
 
-        recognitionInstance.onstart = () => {
-          console.log("Speech recognition started");
-        };
-
-        setRecognition(recognitionInstance);
+        setRecognition(rec);
       }
     }
   }, []);
@@ -108,14 +82,8 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
     setIsProcessing(true);
 
     try {
-      // Add user message to conversation
-      await addMessage({
-        userId,
-        role: "user",
-        content: userMessage,
-      });
+      await addMessage({ userId, role: "user", content: userMessage });
 
-      // Parse the query with AI
       const parseResult = await parseQuery({
         query: userMessage,
         conversationHistory: messages.slice(-6).map((m) => ({
@@ -125,64 +93,45 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
       });
 
       if (parseResult.success && parseResult.result) {
-        const { intent, filters, clarifyingQuestions, confidence } =
-          parseResult.result;
+        const { intent, filters, clarifyingQuestions, confidence } = parseResult.result;
 
-        // If confidence is high, trigger search
         if (confidence >= 0.7) {
-          // Add assistant message
-          const responseText = `Got it! Looking for ${intent}...`;
           await addMessage({
             userId,
             role: "assistant",
-            content: responseText,
+            content: `Looking for ${intent}...`,
             filters,
           });
-
-          // Trigger the search in parent component
           onSearchTriggered(filters, intent);
         } else if (clarifyingQuestions.length > 0) {
-          // Ask clarifying questions
-          const questionsText = clarifyingQuestions.join(" ");
           await addMessage({
             userId,
             role: "assistant",
-            content: questionsText,
+            content: clarifyingQuestions.join(" "),
           });
         } else {
-          // Low confidence but no questions - proceed with best guess
           await addMessage({
             userId,
             role: "assistant",
-            content: `Let me search for ${intent}...`,
+            content: `Searching for ${intent}...`,
             filters,
           });
           onSearchTriggered(filters, intent);
         }
       } else {
-        // Fallback to general chat
         const chatResult = await chatWithAI({
           messages: [
-            ...messages.slice(-6).map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
+            ...messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
             { role: "user", content: userMessage },
           ],
         });
-
-        await addMessage({
-          userId,
-          role: "assistant",
-          content: chatResult.message,
-        });
+        await addMessage({ userId, role: "assistant", content: chatResult.message });
       }
-    } catch (error) {
-      console.error("Error processing message:", error);
+    } catch {
       await addMessage({
         userId,
         role: "assistant",
-        content: "Sorry, I had trouble processing that. Could you rephrase?",
+        content: "Sorry, something went wrong. Could you try again?",
       });
     } finally {
       setIsProcessing(false);
@@ -190,41 +139,27 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
   };
 
   const handleClear = async () => {
-    if (confirm("Clear conversation history?")) {
+    if (confirm("Clear conversation?")) {
       await clearConversation({ userId });
     }
   };
 
-  const toggleVoiceInput = () => {
-    if (!recognition) {
-      alert("Voice input is not supported in your browser. Please use Chrome or Edge.");
-      return;
-    }
+  const toggleVoice = () => {
+    if (!recognition) return;
 
     if (isListening) {
-      try {
-        isListeningRef.current = false; // Set ref first to prevent restart
-        recognition.stop();
-      } catch (error) {
-        console.error("Error stopping recognition:", error);
-      }
+      isListeningRef.current = false;
+      recognition.stop();
       setIsListening(false);
     } else {
-      try {
-        setInput(""); // Clear input before starting
-        isListeningRef.current = true; // Set ref before starting
-        recognition.start();
-        setIsListening(true);
-      } catch (error) {
-        console.error("Error starting recognition:", error);
-        setIsListening(false);
-        isListeningRef.current = false;
-        alert("Failed to start voice input. Please try again.");
-      }
+      setInput("");
+      isListeningRef.current = true;
+      recognition.start();
+      setIsListening(true);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -236,39 +171,27 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "600px",
-        background: "white",
-        borderRadius: "16px",
+        height: 520,
+        background: "var(--bg-secondary)",
+        borderRadius: "var(--radius-lg)",
+        border: "1px solid var(--border-light)",
         overflow: "hidden",
-        boxShadow: "0 4px 24px rgba(0,0,0,0.1)",
       }}
     >
       {/* Header */}
       <div
         style={{
-          padding: "20px",
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-          color: "white",
+          padding: "14px 16px",
+          borderBottom: "1px solid var(--border-light)",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <Sparkles size={24} />
-          <h3 style={{ fontSize: "18px", fontWeight: "600" }}>Chat with Where2</h3>
-        </div>
+        <h3 style={{ fontSize: 15, fontWeight: 600 }}>Chat with Where2</h3>
         <button
           onClick={handleClear}
-          style={{
-            padding: "8px",
-            borderRadius: "8px",
-            background: "rgba(255,255,255,0.2)",
-            color: "white",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-          }}
+          className="btn btn-ghost btn-icon"
           title="Clear conversation"
         >
           <Trash2 size={16} />
@@ -280,47 +203,20 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
         style={{
           flex: 1,
           overflowY: "auto",
-          padding: "20px",
+          padding: 16,
           display: "flex",
           flexDirection: "column",
-          gap: "16px",
+          gap: 12,
         }}
       >
         {messages.length === 0 && (
-          <div
-            style={{
-              textAlign: "center",
-              color: "#666",
-              padding: "40px 20px",
-            }}
-          >
-            <Sparkles
-              size={48}
-              style={{ margin: "0 auto 16px", color: "#667eea" }}
-            />
-            <p style={{ fontSize: "18px", marginBottom: "8px", fontWeight: "600" }}>
-              Hi! I'm your Dubai guide
-            </p>
-            <p style={{ fontSize: "14px" }}>
-              Tell me what you're looking for and I'll help you find the perfect spot!
-            </p>
-            <div
-              style={{
-                marginTop: "24px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "8px",
-                fontSize: "13px",
-              }}
-            >
-              <p style={{ fontWeight: "600" }}>Try asking:</p>
-              <p style={{ fontStyle: "italic" }}>
-                "Find me a family cafe with outdoor seating"
-              </p>
-              <p style={{ fontStyle: "italic" }}>
-                "I want waterfront dinner tonight"
-              </p>
-              <p style={{ fontStyle: "italic" }}>"Cheap breakfast near Marina"</p>
+          <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: "32px 16px" }}>
+            <p style={{ fontSize: 15, fontWeight: 500, marginBottom: 8 }}>Hi! I'm your Dubai guide</p>
+            <p style={{ fontSize: 13, marginBottom: 16 }}>Tell me what you're looking for</p>
+            <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
+              <p>"Family cafe with outdoor seating"</p>
+              <p>"Waterfront dinner tonight"</p>
+              <p>"Budget breakfast near Marina"</p>
             </div>
           </div>
         )}
@@ -330,22 +226,18 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
             key={idx}
             style={{
               display: "flex",
-              justifyContent:
-                message.role === "user" ? "flex-end" : "flex-start",
+              justifyContent: message.role === "user" ? "flex-end" : "flex-start",
             }}
           >
             <div
               style={{
-                maxWidth: "70%",
-                padding: "12px 16px",
-                borderRadius: "12px",
-                background:
-                  message.role === "user"
-                    ? "#667eea"
-                    : "#f3f4f6",
-                color: message.role === "user" ? "white" : "#333",
-                fontSize: "15px",
-                lineHeight: "1.5",
+                maxWidth: "75%",
+                padding: "10px 14px",
+                borderRadius: "var(--radius-lg)",
+                background: message.role === "user" ? "var(--accent)" : "var(--bg-tertiary)",
+                color: message.role === "user" ? "white" : "var(--text-primary)",
+                fontSize: 14,
+                lineHeight: 1.5,
               }}
             >
               {message.content}
@@ -357,21 +249,16 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
           <div style={{ display: "flex", justifyContent: "flex-start" }}>
             <div
               style={{
-                padding: "12px 16px",
-                borderRadius: "12px",
-                background: "#f3f4f6",
+                padding: "10px 14px",
+                borderRadius: "var(--radius-lg)",
+                background: "var(--bg-tertiary)",
                 display: "flex",
                 alignItems: "center",
-                gap: "8px",
+                gap: 8,
               }}
             >
-              <Loader2
-                size={16}
-                style={{ animation: "spin 1s linear infinite" }}
-              />
-              <span style={{ fontSize: "14px", color: "#666" }}>
-                Thinking...
-              </span>
+              <Loader2 size={14} className="animate-spin" />
+              <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Thinking...</span>
             </div>
           </div>
         )}
@@ -380,95 +267,70 @@ export function ChatInterface({ userId, onSearchTriggered }: ChatInterfaceProps)
       </div>
 
       {/* Input */}
-      <div
-        style={{
-          padding: "16px",
-          borderTop: "1px solid #e5e7eb",
-          background: "#fafafa",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            gap: "12px",
-            alignItems: "flex-end",
-          }}
-        >
+      <div style={{ padding: 12, borderTop: "1px solid var(--border-light)" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder={isListening ? "Listening..." : "Ask me anything about Dubai venues..."}
+            onKeyDown={handleKeyDown}
+            placeholder={isListening ? "Listening..." : "Type a message..."}
             disabled={isProcessing || isListening}
-            rows={2}
+            rows={1}
             style={{
               flex: 1,
-              padding: "12px",
-              borderRadius: "12px",
-              border: `2px solid ${isListening ? "#667eea" : "#e5e7eb"}`,
+              padding: "10px 14px",
+              borderRadius: "var(--radius-md)",
+              border: `1px solid ${isListening ? "var(--accent)" : "var(--border-light)"}`,
               outline: "none",
-              fontSize: "15px",
+              fontSize: 14,
               resize: "none",
               fontFamily: "inherit",
-              background: isListening ? "#f0f4ff" : "white",
+              background: isListening ? "var(--accent-light)" : "var(--bg-secondary)",
+              minHeight: 42,
+              maxHeight: 120,
             }}
           />
+
           <button
-            onClick={toggleVoiceInput}
+            onClick={toggleVoice}
             disabled={isProcessing}
-            className="btn"
+            className="btn btn-icon"
             style={{
-              minWidth: "48px",
-              height: "48px",
-              padding: "12px",
-              background: isListening ? "#ef4444" : "#667eea",
-              color: "white",
-              borderRadius: "12px",
-              border: "none",
-              cursor: isProcessing ? "not-allowed" : "pointer",
-              opacity: isProcessing ? 0.5 : 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              background: isListening ? "var(--error)" : "var(--bg-tertiary)",
+              color: isListening ? "white" : "var(--text-secondary)",
+              height: 42,
+              width: 42,
             }}
-            title={isListening ? "Stop recording" : "Start voice input"}
+            title={isListening ? "Stop" : "Voice input"}
           >
-            {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+            {isListening ? <MicOff size={18} /> : <Mic size={18} />}
           </button>
+
           <button
             onClick={handleSend}
             disabled={!input.trim() || isProcessing}
-            className="btn btn-primary"
+            className="btn btn-primary btn-icon"
             style={{
-              minWidth: "48px",
-              height: "48px",
-              padding: "12px",
-              opacity: !input.trim() || isProcessing ? 0.5 : 1,
+              height: 42,
+              width: 42,
+              opacity: !input.trim() || isProcessing ? 0.6 : 1,
             }}
           >
-            <Send size={20} />
+            <Send size={18} />
           </button>
         </div>
-        <p
-          style={{
-            fontSize: "12px",
-            color: "#999",
-            marginTop: "8px",
-            textAlign: "center",
-          }}
-        >
-          Press Enter to send • Shift+Enter for new line • Click mic for voice input
+        <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 8, textAlign: "center" }}>
+          Enter to send · Shift+Enter for new line
         </p>
       </div>
 
       <style jsx>{`
         @keyframes spin {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
         }
       `}</style>
     </div>

@@ -12,8 +12,6 @@ import {
   Share2,
   Navigation,
   Clock,
-  ParkingCircle,
-  Info,
 } from "lucide-react";
 import { Id } from "../../../convex/_generated/dataModel";
 
@@ -32,10 +30,12 @@ export default function PlaceDetailsPage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "white",
         }}
       >
-        <p>Loading...</p>
+        <div style={{ textAlign: "center" }}>
+          <div className="skeleton" style={{ width: 200, height: 24, margin: "0 auto 12px" }} />
+          <div className="skeleton" style={{ width: 140, height: 16, margin: "0 auto" }} />
+        </div>
       </div>
     );
   }
@@ -69,290 +69,254 @@ export default function PlaceDetailsPage() {
     if (navigator.share) {
       try {
         await navigator.share(shareData);
-      } catch (err) {
-        console.log("Share cancelled");
-      }
+      } catch {}
     } else {
       navigator.clipboard.writeText(`${shareData.title}\n${shareData.text}\n${shareData.url}`);
-      alert("Link copied to clipboard!");
+      alert("Link copied!");
     }
   };
 
-  const getPriceLevelSymbols = (level: string) => {
-    const map: { [key: string]: string } = {
-      Low: "$",
-      Mid: "$$",
-      High: "$$$",
-      Lux: "$$$$",
-    };
+  const getPriceSymbol = (level: string) => {
+    const map: Record<string, string> = { Low: "$", Mid: "$$", High: "$$$", Lux: "$$$$" };
     return map[level] || level;
   };
 
   const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
   const today = days[new Date().getDay()];
 
+  // Use Google photos if available
+  const imageUrl = place.googlePhotos?.[0] || place.coverImage;
+  const galleryImages = place.googlePhotos?.slice(1, 5) || place.gallery || [];
+
   return (
-    <main style={{ minHeight: "100vh", paddingBottom: "40px" }}>
+    <main style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>
       {/* Header */}
-      <div style={{ background: "rgba(255,255,255,0.1)", backdropFilter: "blur(10px)" }}>
-        <div className="container" style={{ padding: "20px" }}>
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 100,
+          background: "var(--bg-secondary)",
+          borderBottom: "1px solid var(--border-light)",
+        }}
+      >
+        <div className="container" style={{ padding: "12px 16px" }}>
           <button
             onClick={() => router.back()}
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "8px",
-              color: "white",
-              fontSize: "16px",
-              fontWeight: "500",
+              gap: 8,
+              color: "var(--text-primary)",
+              fontSize: 14,
+              fontWeight: 500,
             }}
           >
-            <ArrowLeft size={20} />
-            Back to results
+            <ArrowLeft size={18} />
+            Back
           </button>
         </div>
-      </div>
+      </header>
 
-      <div className="container" style={{ marginTop: "24px" }}>
+      <div className="container" style={{ padding: "24px 16px 48px" }}>
         {/* Hero Image */}
         <div
           style={{
             width: "100%",
-            height: "400px",
-            borderRadius: "16px",
-            background: `linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.5)), url(${place.coverImage})`,
+            height: 280,
+            borderRadius: "var(--radius-lg)",
+            background: imageUrl
+              ? `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.3)), url(${imageUrl})`
+              : "var(--bg-tertiary)",
             backgroundSize: "cover",
             backgroundPosition: "center",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "flex-end",
-            padding: "32px",
-            marginBottom: "24px",
+            marginBottom: 24,
+            position: "relative",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-            <div>
-              <h1 style={{ color: "white", fontSize: "48px", fontWeight: "700", marginBottom: "8px" }}>
-                {place.name}
-              </h1>
-              {place.nameAr && (
-                <p style={{ color: "rgba(255,255,255,0.9)", fontSize: "24px", marginBottom: "16px" }}>
-                  {place.nameAr}
-                </p>
-              )}
-            </div>
-
-            <span
-              style={{
-                background: place.isOpen ? "#10b981" : "#ef4444",
-                color: "white",
-                padding: "8px 20px",
-                borderRadius: "16px",
-                fontSize: "16px",
-                fontWeight: "600",
-              }}
-            >
+          {/* Status Badge */}
+          <div style={{ position: "absolute", top: 16, right: 16 }}>
+            <span className={`badge ${place.isOpen ? "badge-success" : "badge-error"}`}>
               {place.isOpen ? "Open Now" : "Closed"}
             </span>
           </div>
         </div>
 
         {/* Main Content */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
-          {/* Left Column */}
+        <div style={{ display: "grid", gap: 24, gridTemplateColumns: "1fr", maxWidth: 800 }}>
+          {/* Title Section */}
           <div>
-            {/* Quick Info */}
-            <div className="card" style={{ marginBottom: "24px" }}>
-              <div style={{ display: "flex", gap: "24px", marginBottom: "16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <Star size={20} fill="#FFD700" color="#FFD700" />
-                  <span style={{ fontSize: "20px", fontWeight: "600" }}>{place.rating.toFixed(1)}</span>
-                </div>
+            <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8, letterSpacing: "-0.02em" }}>
+              {place.name}
+            </h1>
+            {place.nameAr && (
+              <p style={{ color: "var(--text-secondary)", fontSize: 18, marginBottom: 16 }}>{place.nameAr}</p>
+            )}
 
-                <div style={{ fontSize: "18px", fontWeight: "600", color: "#666" }}>
-                  {getPriceLevelSymbols(place.priceLevel)}
-                </div>
-
-                <div style={{ color: "#666" }}>{place.cuisine.join(", ")}</div>
+            {/* Meta Info */}
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <Star size={18} fill="#facc15" color="#facc15" />
+                <span style={{ fontSize: 16, fontWeight: 600 }}>{place.rating.toFixed(1)}</span>
               </div>
-
-              <div style={{ display: "flex", alignItems: "start", gap: "8px", color: "#666", marginBottom: "12px" }}>
-                <MapPin size={18} style={{ marginTop: "2px", flexShrink: 0 }} />
-                <span>{place.area}, Dubai</span>
-              </div>
-
-              {place.metroStation && (
-                <div style={{ color: "#667eea", marginBottom: "12px", fontSize: "16px" }}>
-                  🚇 {place.metroStation} Metro - {place.metroWalkTime} min walk
-                </div>
-              )}
-
-              {place.parkingNote && (
-                <div style={{ display: "flex", alignItems: "start", gap: "8px", color: "#666" }}>
-                  <ParkingCircle size={18} style={{ marginTop: "2px", flexShrink: 0 }} />
-                  <span style={{ fontSize: "14px" }}>{place.parkingNote}</span>
-                </div>
-              )}
+              <span style={{ fontSize: 16, fontWeight: 500, color: "var(--text-secondary)" }}>
+                {getPriceSymbol(place.priceLevel)}
+              </span>
+              <span style={{ color: "var(--text-secondary)", fontSize: 15 }}>{place.cuisine.join(", ")}</span>
             </div>
 
-            {/* Highlights */}
-            <div className="card" style={{ marginBottom: "24px" }}>
-              <h3 style={{ fontSize: "20px", fontWeight: "600", marginBottom: "12px" }}>
-                Why this place?
-              </h3>
-              <p style={{ color: "#666", lineHeight: "1.6" }}>{place.highlights}</p>
+            {/* Location */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)", marginBottom: 8 }}>
+              <MapPin size={16} />
+              <span style={{ fontSize: 14 }}>{place.area}, Dubai</span>
             </div>
+
+            {/* Metro */}
+            {place.metroStation && (
+              <div style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 16 }}>
+                🚇 {place.metroStation} Metro · {place.metroWalkTime} min walk
+              </div>
+            )}
 
             {/* Tags */}
-            <div className="card" style={{ marginBottom: "24px" }}>
-              <h3 style={{ fontSize: "20px", fontWeight: "600", marginBottom: "12px" }}>
-                Features
-              </h3>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                {place.tags.map((tag) => (
-                  <span
-                    key={tag}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {place.tags.map((tag) => (
+                <span
+                  key={tag}
+                  style={{
+                    background: "var(--bg-tertiary)",
+                    color: "var(--text-secondary)",
+                    padding: "6px 12px",
+                    borderRadius: "var(--radius-full)",
+                    fontSize: 13,
+                    fontWeight: 500,
+                  }}
+                >
+                  {tag.replace("-", " ")}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div
+            className="card"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, 1fr)",
+              gap: 12,
+            }}
+          >
+            <button onClick={handleNavigate} className="btn btn-primary" style={{ gridColumn: "span 2" }}>
+              <Navigation size={18} />
+              Get Directions
+            </button>
+
+            {place.phone && (
+              <button onClick={handleCall} className="btn btn-secondary">
+                <Phone size={18} />
+                Call
+              </button>
+            )}
+
+            {place.bookingUrl && (
+              <button onClick={handleBook} className="btn btn-secondary">
+                <ExternalLink size={18} />
+                Book
+              </button>
+            )}
+
+            {place.website && (
+              <button onClick={() => window.open(place.website, "_blank")} className="btn btn-secondary">
+                <ExternalLink size={18} />
+                Website
+              </button>
+            )}
+
+            <button
+              onClick={handleShare}
+              className="btn btn-outline"
+              style={{ gridColumn: !place.phone && !place.bookingUrl && !place.website ? "span 2" : "auto" }}
+            >
+              <Share2 size={18} />
+              Share
+            </button>
+          </div>
+
+          {/* Highlights */}
+          {place.highlights && (
+            <div className="card">
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>About this place</h3>
+              <p style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.6 }}>{place.highlights}</p>
+            </div>
+          )}
+
+          {/* Opening Hours */}
+          {place.openingHours && (
+            <div className="card">
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                <Clock size={18} />
+                <h3 style={{ fontSize: 16, fontWeight: 600 }}>Opening Hours</h3>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {days.map((day) => (
+                  <div
+                    key={day}
                     style={{
-                      background: "#e0e7ff",
-                      color: "#667eea",
-                      padding: "8px 16px",
-                      borderRadius: "16px",
-                      fontSize: "14px",
-                      fontWeight: "500",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      padding: "8px 12px",
+                      background: day === today ? "var(--accent-light)" : "transparent",
+                      borderRadius: "var(--radius-sm)",
                     }}
                   >
-                    {tag.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}
-                  </span>
+                    <span
+                      style={{
+                        fontWeight: day === today ? 600 : 400,
+                        fontSize: 14,
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {day}
+                    </span>
+                    <span style={{ color: "var(--text-secondary)", fontSize: 14 }}>
+                      {place.openingHours![day as keyof typeof place.openingHours]}
+                    </span>
+                  </div>
                 ))}
               </div>
             </div>
+          )}
 
-            {/* Gallery */}
-            {place.gallery && place.gallery.length > 0 && (
-              <div className="card">
-                <h3 style={{ fontSize: "20px", fontWeight: "600", marginBottom: "12px" }}>
-                  Gallery
-                </h3>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  {place.gallery.map((image, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        width: "100%",
-                        height: "150px",
-                        borderRadius: "8px",
-                        background: `url(${image})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right Column */}
-          <div>
-            {/* Action Buttons */}
-            <div className="card" style={{ marginBottom: "24px" }}>
-              <h3 style={{ fontSize: "20px", fontWeight: "600", marginBottom: "16px" }}>
-                Quick Actions
-              </h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                <button onClick={handleNavigate} className="btn btn-primary" style={{ width: "100%" }}>
-                  <Navigation size={20} />
-                  Get Directions
-                </button>
-
-                {place.phone && (
-                  <button onClick={handleCall} className="btn btn-secondary" style={{ width: "100%" }}>
-                    <Phone size={20} />
-                    Call {place.phone}
-                  </button>
-                )}
-
-                {place.bookingUrl && (
-                  <button onClick={handleBook} className="btn btn-secondary" style={{ width: "100%" }}>
-                    <ExternalLink size={20} />
-                    Book a Table
-                  </button>
-                )}
-
-                {place.website && (
-                  <button
-                    onClick={() => window.open(place.website, "_blank")}
-                    className="btn btn-secondary"
-                    style={{ width: "100%" }}
-                  >
-                    <ExternalLink size={20} />
-                    Visit Website
-                  </button>
-                )}
-
-                <button onClick={handleShare} className="btn btn-secondary" style={{ width: "100%" }}>
-                  <Share2 size={20} />
-                  Share This Place
-                </button>
+          {/* Gallery */}
+          {galleryImages.length > 0 && (
+            <div className="card">
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Gallery</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                {galleryImages.map((image, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      width: "100%",
+                      height: 140,
+                      borderRadius: "var(--radius-md)",
+                      background: `url(${image})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                    }}
+                  />
+                ))}
               </div>
             </div>
+          )}
 
-            {/* Opening Hours */}
-            {place.openingHours && (
-              <div className="card" style={{ marginBottom: "24px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-                  <Clock size={20} />
-                  <h3 style={{ fontSize: "20px", fontWeight: "600" }}>Opening Hours</h3>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {days.map((day) => (
-                    <div
-                      key={day}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        padding: "8px",
-                        background: day === today ? "#e0e7ff" : "transparent",
-                        borderRadius: "6px",
-                      }}
-                    >
-                      <span style={{ fontWeight: day === today ? "600" : "400", textTransform: "capitalize" }}>
-                        {day}
-                      </span>
-                      <span style={{ color: "#666" }}>
-                        {place.openingHours![day as keyof typeof place.openingHours]}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Additional Info */}
-            {place.seatingTypes && place.seatingTypes.length > 0 && (
-              <div className="card">
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                  <Info size={20} />
-                  <h3 style={{ fontSize: "20px", fontWeight: "600" }}>Seating Options</h3>
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                  {place.seatingTypes.map((type) => (
-                    <span
-                      key={type}
-                      style={{
-                        background: "#f3f4f6",
-                        padding: "6px 12px",
-                        borderRadius: "12px",
-                        fontSize: "14px",
-                      }}
-                    >
-                      {type.charAt(0).toUpperCase() + type.slice(1)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Parking Note */}
+          {place.parkingNote && (
+            <div className="card">
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Parking</h3>
+              <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>{place.parkingNote}</p>
+            </div>
+          )}
         </div>
       </div>
     </main>
