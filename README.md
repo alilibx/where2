@@ -1,8 +1,8 @@
 # Where2 Dubai (Mouoj) — AI-Powered City Guide
 
-**Status: MVP Complete (95%+) | Production Ready**
+**Status: MVP Complete (100%) | Production Ready**
 
-A hyper-filtered, AI-powered city guide application for Dubai that helps users discover the perfect venue based on their mood, constraints, and context. Features natural language understanding, conversational chat interface, and intelligent search parsing powered by GPT-4o.
+A hyper-filtered, AI-powered city guide application for Dubai that helps users discover the perfect venue based on their mood, constraints, and context. Features natural language understanding, conversational chat interface, intelligent search parsing powered by GPT-4o, and hybrid semantic search with vector embeddings.
 
 ## 🎯 Product Vision
 
@@ -17,11 +17,13 @@ Remove decision fatigue by matching a user's intent (mood, constraints, timing, 
 | **Dual Modes** | ✓ Search + Chat interfaces | ✅ **COMPLETE** | Both modes fully functional with mode switcher |
 | **Voice Search** | ✓ Web Speech API | ✅ **COMPLETE** | `AISearchBar.tsx`, `ChatInterface.tsx` - Voice + text input |
 | **Venue Details** | ✓ Full detail pages | ✅ **COMPLETE** | `app/place/[id]/page.tsx` - Gallery, hours, actions |
-| **Database Schema** | ✓ 4 collections | ✅ **COMPLETE** | `convex/schema.ts` - places, preferences, history, conversations |
+| **Database Schema** | ✓ 5 collections | ✅ **COMPLETE** | `convex/schema.ts` - places, preferences, history, conversations, feedback |
 | **Preference Learning** | ✓ User memory | ✅ **COMPLETE** | `convex/preferences.ts` - Tag learning, vibe summary |
-| **Semantic Search** | ⚡ Post-MVP enhancement | ✅ **BONUS** | `convex/semanticSearch.ts` - Vector search ready (not yet in main flow) |
+| **Semantic Search** | ⚡ Post-MVP enhancement | ✅ **COMPLETE** | `convex/semanticSearch.ts` - Vector search with cached embeddings |
+| **Hybrid Search** | ⚡ Post-MVP enhancement | ✅ **COMPLETE** | `convex/hybridSearch.ts` - Combined filter + semantic search |
+| **Google Places Integration** | ⚡ Post-MVP enhancement | ✅ **COMPLETE** | Full API integration with ToS-compliant data sync |
 
-**Overall: 95%+ MVP Complete** — All core features implemented and functional. Semantic/vector search built as enhancement but not yet integrated into main search flow.
+**Overall: 100% MVP Complete** — All core features implemented and functional. Semantic/vector search and hybrid search fully integrated into main search flow.
 
 ### 🎯 What's Implemented
 
@@ -41,16 +43,23 @@ Remove decision fatigue by matching a user's intent (mood, constraints, timing, 
 - ✅ Conversation management (`convex/conversations.ts`)
 - ✅ User preference learning (`convex/preferences.ts`)
 - ✅ Vector embeddings generation (`convex/embeddings.ts`)
-- ✅ Semantic/vector search (`convex/semanticSearch.ts`)
-- ✅ Complete database schema with indexes (`convex/schema.ts`)
+- ✅ Semantic/vector search with cached embeddings (`convex/semanticSearch.ts`)
+- ✅ Hybrid search (filter + semantic) (`convex/hybridSearch.ts`)
+- ✅ Google Places API integration (`convex/googlePlaces.ts`)
+- ✅ AI-assisted venue enrichment (`convex/enrichment.ts`)
+- ✅ User feedback system (`convex/feedback.ts`)
+- ✅ Complete database schema with vector indexes (`convex/schema.ts`)
 - ✅ Sample data seeder (`convex/seedData.ts`)
+- ✅ Action caching for embeddings (`@convex-dev/action-cache`)
 
 **AI Integration**
 - ✅ OpenRouter API with GPT-4o (query parsing)
 - ✅ GPT-4o-mini (chat responses)
+- ✅ OpenAI text-embedding-3-small (vector embeddings via OpenRouter)
 - ✅ Structured JSON Schema validation with Zod
 - ✅ Confidence scoring and clarifying questions
 - ✅ Context awareness (time, weather, location)
+- ✅ 24-hour embedding cache for cost optimization
 
 ### 🔄 Integration Opportunities
 
