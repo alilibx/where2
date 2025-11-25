@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import "./globals.css";
-import { ConvexClientProvider } from "./ConvexClientProvider";
 
 export const metadata: Metadata = {
   title: "Where2 — Dubai City Guide",
   description: "Voice-first, hyper-filtered city guide for Dubai",
 };
+
+// Dynamically import ConvexClientProvider with SSR disabled
+const ConvexClientProvider = dynamic(
+  () => import("./ConvexClientProvider").then((mod) => mod.ConvexClientProvider),
+  { ssr: false }
+);
 
 export default function RootLayout({
   children,
